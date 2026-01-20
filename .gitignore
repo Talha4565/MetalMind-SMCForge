@@ -1,0 +1,46 @@
+# Node modules (LARGE)
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+env/
+
+# Model files (LARGE - optional)
+*.pkl
+*.h5
+
+# Data files (LARGE)
+Gold Dataset/
+*.csv
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+*.swp
+
+# IDE
+.vscode/
+.idea/
+
+# Reports output (keep structure)
+reports/shap_plots/*.png
+reports/backtest_results/*.json
+
+# Temp
+tmp_*
+temp_*
+
+# Windows
+NTUSER.DAT*
+ntuser.*
+
+# Personal
+*.docx
+*.pdf
+*.xlsx
