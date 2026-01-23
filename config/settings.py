@@ -14,6 +14,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 MODELS_DIR = PROJECT_ROOT / "models"
 REPORTS_DIR = PROJECT_ROOT / "reports"
 GOLD_DATASET_DIR = PROJECT_ROOT / "Gold Dataset"
+SILVER_DATASET_DIR = PROJECT_ROOT / "Silver Dataset"
 
 # Create directories if they don't exist
 for dir_path in [DATA_DIR, MODELS_DIR, REPORTS_DIR]:
@@ -33,6 +34,15 @@ ASSETS = {
             "30m": GOLD_DATASET_DIR / "Gold_30m_Candlestick.csv",
             "1h": GOLD_DATASET_DIR / "Gold_1h_Candlestick.csv"
         }
+    },
+    "silver": {
+        "name": "XAG/USD",
+        "files": {
+            "5m": SILVER_DATASET_DIR / "Silver_5m_Candlestick.csv",
+            "15m": SILVER_DATASET_DIR / "Silver_15m_Candlestick.csv",
+            "30m": SILVER_DATASET_DIR / "Silver_30m_Candlestick.csv",
+            "1h": SILVER_DATASET_DIR / "Silver_1h_Candlestick.csv"
+        }
     }
 }
 
@@ -42,8 +52,8 @@ ASSETS = {
 BASELINE_CONFIG = {
     "primary_timeframe": "15m",
     "label_params": {
-        "take_profit_pct": 0.0045,  # 0.45% (3:1 risk/reward)
-        "stop_loss_pct": 0.0015,     # 0.15%
+        "take_profit_pct": 0.0015,  # 0.15% (adjusted for Silver volatility - was 0.0045 for Gold)
+        "stop_loss_pct": 0.0005,     # 0.05% (adjusted for Silver volatility - was 0.0015 for Gold)
         "max_bars": 6                # Look ahead 6 bars (90 minutes on 15m)
     },
     "session_filter": {

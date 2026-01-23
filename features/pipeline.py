@@ -55,11 +55,25 @@ def engineer_all_features(df: pd.DataFrame, add_labels: bool = True) -> pd.DataF
         df['target'] = generate_labels(df)
     
     # Drop NaNs from feature computation
+    rows_before = len(df)
     df.dropna(inplace=True)
+    rows_after = len(df)
+    
+    if rows_after == 0:
+        raise ValueError(
+            f"All rows removed after dropna()! Started with {rows_before} rows. "
+            "Check for NaN values in features or labels. This may indicate insufficient data "
+            "or issues with feature engineering."
+        )
+    
+    rows_dropped = rows_before - rows_after
+    if rows_dropped > 0:
+        logger.info(f"Dropped {rows_dropped} rows with NaN values ({rows_dropped/rows_before*100:.1f}%)")
     
     final_cols = len(df.columns)
     logger.info(f"Feature engineering complete: {original_cols} → {final_cols} columns "
                 f"({final_cols - original_cols} new features)")
+    logger.info(f"Final dataset: {len(df)} rows")
     
     return df
 

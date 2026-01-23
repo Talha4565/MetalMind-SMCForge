@@ -7,11 +7,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, Cell
 } from 'recharts';
-import axios from 'axios';
 import InfoIcon from '@mui/icons-material/Info';
 import ExportButtons from './ExportButtons';
-
-const API_BASE = 'http://localhost:5000/api';
+import axios from '../utils/axios';
 
 function ShapAnalysis() {
   const [data, setData] = useState(null);
@@ -21,13 +19,13 @@ function ShapAnalysis() {
 
   useEffect(() => {
     fetchShapData();
-    setImageUrl(`${API_BASE}/shap/plot?t=${Date.now()}`);
+    setImageUrl(`http://localhost:5000/api/shap/plot?t=${Date.now()}`);
   }, []);
 
   const fetchShapData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE}/shap/feature-importance`);
+      const response = await axios.get(`/shap/feature-importance`);
       setData(response.data);
       setError(null);
     } catch (err) {
