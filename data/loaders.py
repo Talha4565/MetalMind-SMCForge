@@ -44,6 +44,11 @@ class MultiTimeframeLoader:
         df.set_index('DateTime', inplace=True)
         df.sort_index(inplace=True)
         
+        # Remove duplicate timestamps (can occur in synthetic data)
+        if df.index.duplicated().any():
+            logger.warning(f"Found {df.index.duplicated().sum()} duplicate timestamps, removing...")
+            df = df[~df.index.duplicated(keep='first')]
+        
         # Rename columns to standard format
         df.rename(columns={
             'Open': 'open',
@@ -159,6 +164,40 @@ def load_gold_data(primary_tf: str = "15m",
     return loader.get_aligned_dataset(primary_tf, apply_session=session_filter)
 
 
+def load_silver_data(primary_tf: str = "15m", 
+                     session_filter: bool = True) -> pd.DataFrame:
+    """
+    Convenience function to load Silver data with multi-timeframe features.
+    
+    Args:
+        primary_tf: Primary timeframe for predictions (default "15m")
+        session_filter: Whether to filter to London+NY session (default True)
+    
+    Returns:
+        DataFrame with aligned multi-timeframe data
+    """
+    loader = MultiTimeframeLoader(asset="silver")
+    return loader.get_aligned_dataset(primary_tf, apply_session=session_filter)
+
+
+def load_asset_data(asset: str = "gold",
+                    primary_tf: str = "15m", 
+                    session_filter: bool = True) -> pd.DataFrame:
+    """
+    Generic function to load any asset data with multi-timeframe features.
+    
+    Args:
+        asset: Asset name ("gold" or "silver")
+        primary_tf: Primary timeframe for predictions (default "15m")
+        session_filter: Whether to filter to London+NY session (default True)
+    
+    Returns:
+        DataFrame with aligned multi-timeframe data
+    """
+    loader = MultiTimeframeLoader(asset=asset)
+    return loader.get_aligned_dataset(primary_tf, apply_session=session_filter)
+
+
 def train_val_test_split(df: pd.DataFrame, 
                          train_pct: float = 0.70,
                          val_pct: float = 0.15,
@@ -177,6 +216,10 @@ def train_val_test_split(df: pd.DataFrame,
         Tuple of (train_df, val_df, test_df)
     """
     n = len(df)
+    
+    if n == 0:
+        raise ValueError("Cannot split empty dataframe. Check data loading and feature engineering pipeline.")
+    
     train_end = int(n * train_pct)
     val_end = int(n * (train_pct + val_pct))
     

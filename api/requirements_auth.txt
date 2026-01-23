@@ -1,0 +1,18 @@
+# Core authentication requirements
+flask-bcrypt==1.0.1
+flask-limiter==3.5.0
+pyjwt==2.8.0
+pyotp==2.9.0
+qrcode==7.4.2
+
+# Database
+flask-sqlalchemy==3.1.1
+sqlalchemy==2.0.23
+
+# Email service (optional - will use console fallback if not available)
+# resend==0.8.0
+
+# Optional: For production
+# pillow==11.0.0  # Only if you need QR code images
+# redis==5.0.1    # Only for distributed rate limiting
+# psycopg2-binary==2.9.9  # For PostgreSQL instead of SQLite

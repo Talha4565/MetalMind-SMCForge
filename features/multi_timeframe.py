@@ -48,8 +48,12 @@ def add_higher_timeframe_features(df: pd.DataFrame,
     delta = df[close_col].diff()
     gain = delta.where(delta > 0, 0).rolling(14).mean()
     loss = -delta.where(delta < 0, 0).rolling(14).mean()
-    rs = gain / loss
+    # Avoid division by zero in RSI calculation
+    rs = np.where(loss != 0, gain / loss, 0)
     df[f'htf_{suffix}_rsi'] = 100 - (100 / (1 + rs))
+    # Fill any remaining NaN/inf values
+    df[f'htf_{suffix}_rsi'].replace([np.inf, -np.inf], np.nan, inplace=True)
+    df[f'htf_{suffix}_rsi'].fillna(50, inplace=True)  # Fill with neutral RSI value
     
     # Distance from recent high/low (support/resistance)
     rolling_high = df[high_col].rolling(50).max()

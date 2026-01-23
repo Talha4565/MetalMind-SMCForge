@@ -1,32 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Box, Grid, Card, CardContent, Typography, CircularProgress, 
-  Alert, Chip, LinearProgress 
+  Alert, Chip, LinearProgress, ToggleButton, ToggleButtonGroup 
 } from '@mui/material';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, ReferenceLine, Scatter, ComposedChart
 } from 'recharts';
-import axios from 'axios';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import axios from '../utils/axios';
 
-const API_BASE = 'http://localhost:5000/api';
-
-function LivePredictions() {
+function LivePredictions({ onAssetChange }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState('gold');
 
   useEffect(() => {
     fetchPredictions();
-  }, []);
+    // Notify parent of asset change
+    if (onAssetChange) {
+      onAssetChange(selectedAsset);
+    }
+  }, [selectedAsset, onAssetChange]);
 
   const fetchPredictions = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE}/predictions/latest`);
+      const response = await axios.get(`/predictions/latest?asset=${selectedAsset}&limit=100`);
       setData(response.data);
       setError(null);
     } catch (err) {
@@ -34,6 +37,12 @@ function LivePredictions() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAssetChange = (event, newAsset) => {
+    if (newAsset !== null) {
+      setSelectedAsset(newAsset);
     }
   };
 
@@ -64,6 +73,26 @@ function LivePredictions() {
 
   return (
     <Box>
+      {/* Asset Selector */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h5" fontWeight="600">
+          Live Predictions - {selectedAsset === 'gold' ? '🥇 Gold (XAU/USD)' : '🥈 Silver (XAG/USD)'}
+        </Typography>
+        <ToggleButtonGroup
+          value={selectedAsset}
+          exclusive
+          onChange={handleAssetChange}
+          aria-label="asset selection"
+        >
+          <ToggleButton value="gold" aria-label="gold">
+            🥇 Gold
+          </ToggleButton>
+          <ToggleButton value="silver" aria-label="silver">
+            🥈 Silver
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={3}>
@@ -72,10 +101,13 @@ function LivePredictions() {
               <Box display="flex" alignItems="center" justifyContent="space-between">
                 <Box>
                   <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
-                    Model Accuracy
+                    Active Asset
                   </Typography>
                   <Typography variant="h3" fontWeight="700">
-                    {(data.model_accuracy * 100).toFixed(1)}%
+                    {selectedAsset === 'gold' ? '🥇 GOLD' : '🥈 SILVER'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    {selectedAsset === 'gold' ? 'XAU/USD' : 'XAG/USD'}
                   </Typography>
                 </Box>
                 <CheckCircleIcon sx={{ fontSize: 48, opacity: 0.7 }} />

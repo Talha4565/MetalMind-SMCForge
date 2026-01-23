@@ -8,15 +8,13 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
 } from 'recharts';
-import axios from 'axios';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import ExportButtons from './ExportButtons';
 import BacktestControl from './BacktestControl';
-
-const API_BASE = 'http://localhost:5000/api';
+import axios from '../utils/axios';
 
 function BacktestResults() {
   const [data, setData] = useState(null);
@@ -37,7 +35,7 @@ function BacktestResults() {
     try {
       setLoading(true);
       console.log('Fetching backtest results from API...');
-      const response = await axios.get(`${API_BASE}/backtest/results`);
+      const response = await axios.get(`/backtest/results`);
       console.log('Backtest data received:', response.data);
       setData(response.data);
       setError(null);

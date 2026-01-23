@@ -23,8 +23,15 @@ def add_vwap_deviation(df: pd.DataFrame, windows: List[int] = [4, 16, 96]) -> pd
     df = df.copy()
     
     for w in windows:
-        vwap = (df['close'] * df['volume']).rolling(w).sum() / df['volume'].rolling(w).sum()
+        volume_sum = df['volume'].rolling(w).sum()
+        # Avoid division by zero - replace zero volume with NaN, will be forward filled
+        volume_sum = volume_sum.replace(0, np.nan)
+        vwap = (df['close'] * df['volume']).rolling(w).sum() / volume_sum
+        # Avoid division by zero in deviation calculation
+        vwap = vwap.replace(0, np.nan)
         df[f'VWAPd_{w}'] = (df['close'] - vwap) / vwap
+        # Fill NaN values with 0 (no deviation when volume is zero)
+        df[f'VWAPd_{w}'].fillna(0, inplace=True)
     
     return df
 
@@ -86,7 +93,12 @@ def add_volume_imbalance(df: pd.DataFrame, windows: List[int] = [4, 16, 96]) -> 
         sell_sum = sell_volume.rolling(w).sum()
         total_volume = df['volume'].rolling(w).sum()
         
-        df[f'Imbal_{w}'] = (buy_sum - sell_sum) / total_volume
+        # Avoid division by zero - set to 0 when total volume is 0
+        df[f'Imbal_{w}'] = np.where(
+            total_volume > 0,
+            (buy_sum - sell_sum) / total_volume,
+            0  # No imbalance when volume is zero
+        )
     
     return df
 
