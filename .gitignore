@@ -28,6 +28,11 @@ Gold Dataset/
 .vscode/
 .idea/
 
+# Environment secrets — NEVER commit these
+.env
+.env.local
+.env.production
+
 # Reports output (keep structure)
 reports/shap_plots/*.png
 reports/backtest_results/*.json

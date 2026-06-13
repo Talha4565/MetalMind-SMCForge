@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetalMind SMCForge | AI-Powered Institutional Trading Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        gold: '#fbbf24',
+                        silver: '#94a3b8',
+                        buy: '#22c55e',
+                        sell: '#ef4444',
+                        neutral: '#64748b',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        .glass {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .gradient-border {
+            position: relative;
+        }
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, #22c55e, #14b8a6, #0ea5e9);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100vh); }
+        }
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .ticker-tape {
+            animation: ticker 40s linear infinite;
+        }
+        @keyframes ticker {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .neural-pattern {
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+
+        .chart-grid {
+            background-image: 
+                linear-gradient(to right, rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+            background-size: 50px 30px;
+        }
+
+        .candle-green {
+            background: linear-gradient(180deg, #22c55e, #16a34a);
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+        }
+        .candle-red {
+            background: linear-gradient(180deg, #ef4444, #dc2626);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+        }
+
+        .order-block-bullish {
+            background: linear-gradient(180deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+            border-left: 2px solid #22c55e;
+        }
+        .order-block-bearish {
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+            border-left: 2px solid #ef4444;
+        }
+
+        .fvg-zone {
+            background: rgba(168, 85, 247, 0.1);
+            border-top: 1px dashed rgba(168, 85, 247, 0.5);
+            border-bottom: 1px dashed rgba(168, 85, 247, 0.5);
+        }
+
+        .bos-line {
+            border-top: 2px dashed rgba(251, 191, 36, 0.6);
+        }
+        .choch-line {
+            border-top: 2px dotted rgba(6, 182, 212, 0.6);
+        }
+
+        /* Light mode overrides */
+        html:not(.dark) body {
+            background: #f8fafc;
+            color: #1e293b;
+        }
+        html:not(.dark) .bg-slate-900 { background: #ffffff; }
+        html:not(.dark) .bg-slate-950 { background: #f1f5f9; }
+        html:not(.dark) .bg-slate-800 { background: #e2e8f0; }
+        html:not(.dark) .text-white { color: #0f172a; }
+        html:not(.dark) .text-slate-300 { color: #475569; }
+        html:not(.dark) .text-slate-400 { color: #64748b; }
+        html:not(.dark) .border-slate-700 { border-color: #cbd5e1; }
+        html:not(.dark) .border-slate-800 { border-color: #e2e8f0; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-300 font-sans h-screen flex flex-col overflow-hidden neural-pattern">
+    <div class="scanline"></div>
+
+    <!-- ==================== MODULE 1: AUTHENTICATION MODAL ==================== -->
+    <div id="authModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center">
+        <div class="glass border border-slate-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-gold to-amber-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-gold/30">
+                    <i class="fa-solid fa-brain text-white text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-white">MetalMind SMCForge</h2>
+                <p class="text-slate-400 text-sm mt-1">Neural Trading Engine v3.2</p>
+            </div>
+
+            <div class="flex bg-slate-800 rounded-lg p-1 mb-6">
+                <button onclick="switchAuthTab('login')" id="loginTabBtn" class="flex-1 py-2 text-sm font-semibold rounded-md bg-slate-700 text-white transition">Login</button>
+                <button onclick="switchAuthTab('signup')" id="signupTabBtn" class="flex-1 py-2 text-sm font-semibold rounded-md text-slate-400 hover:text-white transition">Sign Up</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Email Address</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-envelope absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <input type="email" placeholder="trader@example.com" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 pl-10 rounded-lg focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold/30">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Password</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                        <input type="password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 pl-10 rounded-lg focus:outline-none focus:border-gold">
+                        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="accent-gold">
+                        <span class="text-slate-400">Remember me</span>
+                    </label>
+                    <a href="#" class="text-gold hover:underline text-xs">Forgot password?</a>
+                </div>
+                <button type="button" onclick="handleLogin()" class="w-full bg-gradient-to-r from-gold to-amber-600 hover:from-amber-500 hover:to-gold text-black text-sm py-3 rounded-lg font-semibold transition shadow-lg shadow-gold/25">
+                    <i class="fa-solid fa-right-to-bracket mr-2"></i> Access Dashboard
+                </button>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="space-y-4 hidden">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">First Name</label>
+                        <input type="text" placeholder="John" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 rounded-lg focus:outline-none focus:border-gold">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Last Name</label>
+                        <input type="text" placeholder="Doe" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 rounded-lg focus:outline-none focus:border-gold">
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Email Address</label>
+                    <input type="email" placeholder="trader@example.com" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 rounded-lg focus:outline-none focus:border-gold">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Password</label>
+                    <input type="password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 rounded-lg focus:outline-none focus:border-gold">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 uppercase tracking-wide mb-1 block">Confirm Password</label>
+                    <input type="password" placeholder="••••••••" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-3 rounded-lg focus:outline-none focus:border-gold">
+                </div>
+                <button type="button" onclick="handleSignup()" class="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 text-white text-sm py-3 rounded-lg font-semibold transition shadow-lg shadow-green-500/25">
+                    <i class="fa-solid fa-user-plus mr-2"></i> Create Account
+                </button>
+            </form>
+
+            <div class="mt-6 pt-6 border-t border-slate-700 text-center text-xs text-slate-500">
+                By continuing, you agree to our <a href="#" class="text-gold hover:underline">Terms of Service</a> and <a href="#" class="text-gold hover:underline">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODULE 2: SETTINGS MODAL ==================== -->
+    <div id="settingsModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center hidden">
+        <div class="glass border border-slate-700 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-hidden">
+            <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+                        <i class="fa-solid fa-gear text-slate-400"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Settings & Profile</h2>
+                        <p class="text-xs text-slate-500">Manage your account, preferences, and data connections</p>
+                    </div>
+                </div>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex h-[600px]">
+                <!-- Settings Sidebar -->
+                <div class="w-56 bg-slate-900/50 border-r border-slate-800 p-4">
+                    <nav class="space-y-1">
+                        <button onclick="switchSettingsTab('profile')" class="settings-tab w-full text-left px-3 py-2.5 rounded-lg text-sm text-white bg-slate-800 flex items-center gap-3 transition" data-tab="profile">
+                            <i class="fa-solid fa-user w-4"></i> Profile
+                        </button>
+                        <button onclick="switchSettingsTab('preferences')" class="settings-tab w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition" data-tab="preferences">
+                            <i class="fa-solid fa-sliders w-4"></i> Preferences
+                        </button>
+                        <button onclick="switchSettingsTab('api')" class="settings-tab w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition" data-tab="api">
+                            <i class="fa-solid fa-database w-4"></i> Data Sources
+                        </button>
+                        <button onclick="switchSettingsTab('notifications')" class="settings-tab w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition" data-tab="notifications">
+                            <i class="fa-solid fa-bell w-4"></i> Notifications
+                        </button>
+                        <button onclick="switchSettingsTab('security')" class="settings-tab w-full text-left px-3 py-2.5 rounded-lg text-sm text-slate-400 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition" data-tab="security">
+                            <i class="fa-solid fa-shield-halved w-4"></i> Security
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Settings Content -->
+                <div class="flex-1 p-6 overflow-y-auto">
+                    <!-- Profile Tab -->
+                    <div id="profileTab" class="settings-content">
+                        <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-id-card text-gold"></i> Personal Information
+                        </h3>
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-2xl text-white font-bold border-4 border-slate-800">
+                                JD
+                            </div>
+                            <div>
+                                <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition border border-slate-700">
+                                    <i class="fa-solid fa-camera mr-2"></i>Change Avatar
+                                </button>
+                                <p class="text-[10px] text-slate-500 mt-2">JPG, PNG. Max 2MB</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">First Name</label>
+                                <input type="text" value="John" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">Last Name</label>
+                                <input type="text" value="Doe" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">Email Address</label>
+                                <input type="email" value="john.doe@trader.com" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">Timezone</label>
+                                <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                                    <option>UTC-5 (Eastern Time - NY)</option>
+                                    <option>UTC+0 (London)</option>
+                                    <option selected>UTC+5:30 (India - IST)</option>
+                                    <option>UTC+8 (Singapore)</option>
+                                </select>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">Trading Experience</label>
+                                <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                                    <option>Beginner (0-1 years)</option>
+                                    <option selected>Intermediate (1-3 years)</option>
+                                    <option>Advanced (3-5 years)</option>
+                                    <option>Professional (5+ years)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex gap-3">
+                            <button class="bg-gold hover:bg-amber-500 text-black text-sm px-6 py-2.5 rounded-lg font-semibold transition">
+                                Save Changes
+                            </button>
+                            <button class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm px-6 py-2.5 rounded-lg transition">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div id="preferencesTab" class="settings-content hidden">
+                        <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-palette text-purple-400"></i> Display Preferences
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Theme Mode</div>
+                                    <div class="text-xs text-slate-500">Switch between dark and light theme</div>
+                                </div>
+                                <button onclick="toggleTheme()" id="themeToggle" class="w-14 h-7 bg-slate-700 rounded-full relative transition-colors duration-300">
+                                    <div class="absolute left-1 top-1 w-5 h-5 bg-gold rounded-full flex items-center justify-center transition-transform duration-300">
+                                        <i class="fa-solid fa-moon text-[10px] text-black"></i>
+                                    </div>
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Default Commodity</div>
+                                    <div class="text-xs text-slate-500">Set your preferred trading asset on login</div>
+                                </div>
+                                <select class="bg-slate-900 border border-slate-700 text-white text-sm p-2 rounded-lg w-40">
+                                    <option selected>XAU/USD (Gold)</option>
+                                    <option>XAG/USD (Silver)</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Default Timeframe</div>
+                                    <div class="text-xs text-slate-500">Preferred chart interval</div>
+                                </div>
+                                <select class="bg-slate-900 border border-slate-700 text-white text-sm p-2 rounded-lg w-40">
+                                    <option>5 Minutes</option>
+                                    <option selected>15 Minutes</option>
+                                    <option>1 Hour</option>
+                                    <option>4 Hours</option>
+                                    <option>Daily</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Default Risk Per Trade</div>
+                                    <div class="text-xs text-slate-500">Position sizing preference</div>
+                                </div>
+                                <select class="bg-slate-900 border border-slate-700 text-white text-sm p-2 rounded-lg w-40">
+                                    <option>0.5%</option>
+                                    <option selected>1.0%</option>
+                                    <option>1.5%</option>
+                                    <option>2.0%</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Chart Style</div>
+                                    <div class="text-xs text-slate-500">Candlestick appearance</div>
+                                </div>
+                                <select class="bg-slate-900 border border-slate-700 text-white text-sm p-2 rounded-lg w-40">
+                                    <option selected>Colored</option>
+                                    <option>Monochrome</option>
+                                    <option>Hollow</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API/Data Tab (MODULE 3) -->
+                    <div id="apiTab" class="settings-content hidden">
+                        <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-plug text-blue-400"></i> Data Source Configuration
+                        </h3>
+                        
+                        <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4 flex items-start gap-3">
+                            <i class="fa-solid fa-circle-check text-green-400 mt-0.5"></i>
+                            <div>
+                                <div class="text-green-400 text-sm font-semibold">Kaggle Dataset Connected</div>
+                                <p class="text-xs text-slate-400 mt-1">Gold/Silver Historical Data (2004-2024) • 20+ years of OHLCV data</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-xs text-slate-400 uppercase mb-1 block">Primary Data Source</label>
+                                <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                                    <option selected>Kaggle Dataset (Gold/Silver 2004-2024) - Recommended</option>
+                                    <option>Yahoo Finance API (Real-time)</option>
+                                    <option>Alpha Vantage API</option>
+                                    <option>Polygon.io API</option>
+                                    <option>Upload Custom CSV</option>
+                                </select>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-xs text-slate-400 uppercase mb-1 block">API Key (Optional)</label>
+                                    <input type="password" placeholder="Enter API key for live data" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-400 uppercase mb-1 block">Data Refresh Interval</label>
+                                    <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                                        <option>Real-time (WebSocket)</option>
+                                        <option>Every 1 minute</option>
+                                        <option selected>Every 5 minutes</option>
+                                        <option>Every 15 minutes</option>
+                                        <option>Manual refresh only</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm text-white font-medium">Data Quality Status</span>
+                                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">Excellent</span>
+                                </div>
+                                <div class="space-y-2 text-xs">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Gold Records</span>
+                                        <span class="text-white font-mono">2,847,392</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Silver Records</span>
+                                        <span class="text-white font-mono">2,847,392</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Last Updated</span>
+                                        <span class="text-white font-mono">2024-12-31 23:59:59</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Data Completeness</span>
+                                        <span class="text-green-400 font-mono">99.97%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3">
+                                <button class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded-lg font-semibold transition flex items-center gap-2">
+                                    <i class="fa-solid fa-rotate"></i> Test Connection
+                                </button>
+                                <button class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm px-4 py-2 rounded-lg transition border border-slate-700">
+                                    <i class="fa-solid fa-download mr-2"></i>Download Sample
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notifications Tab -->
+                    <div id="notificationsTab" class="settings-content hidden">
+                        <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-bell text-yellow-400"></i> Notification Settings
+                        </h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Signal Alerts</div>
+                                    <div class="text-xs text-slate-500">Get notified on new BUY/SELL signals</div>
+                                </div>
+                                <input type="checkbox" checked class="accent-gold w-5 h-5">
+                            </label>
+                            <label class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Backtest Complete</div>
+                                    <div class="text-xs text-slate-500">Notify when backtest simulation finishes</div>
+                                </div>
+                                <input type="checkbox" checked class="accent-gold w-5 h-5">
+                            </label>
+                            <label class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Price Alerts</div>
+                                    <div class="text-xs text-slate-500">Custom price level notifications</div>
+                                </div>
+                                <input type="checkbox" class="accent-gold w-5 h-5">
+                            </label>
+                            <label class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Email Reports</div>
+                                    <div class="text-xs text-slate-500">Daily performance summary via email</div>
+                                </div>
+                                <input type="checkbox" class="accent-gold w-5 h-5">
+                            </label>
+                            <label class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:border-slate-600 transition">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Model Retraining</div>
+                                    <div class="text-xs text-slate-500">Alert when rolling-window retraining completes</div>
+                                </div>
+                                <input type="checkbox" checked class="accent-gold w-5 h-5">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div id="securityTab" class="settings-content hidden">
+                        <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-red-400"></i> Security Settings
+                        </h3>
+                        <div class="space-y-4">
+                            <div class="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <h4 class="text-sm text-white font-semibold mb-3">Change Password</h4>
+                                <div class="space-y-3">
+                                    <input type="password" placeholder="Current Password" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                                    <input type="password" placeholder="New Password" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                                    <input type="password" placeholder="Confirm New Password" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                                    <button class="bg-gold hover:bg-amber-500 text-black text-sm px-4 py-2 rounded-lg font-semibold transition">
+                                        Update Password
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Two-Factor Authentication</div>
+                                    <div class="text-xs text-slate-500">Add extra security to your account</div>
+                                </div>
+                                <button class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition">Enable 2FA</button>
+                            </div>
+                            <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                                <div>
+                                    <div class="text-sm text-white font-medium">Session Management</div>
+                                    <div class="text-xs text-slate-500">Active sessions: 1 device</div>
+                                </div>
+                                <button class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition">View Sessions</button>
+                            </div>
+                            <div class="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                                <h4 class="text-sm text-red-400 font-semibold mb-2">Danger Zone</h4>
+                                <p class="text-xs text-slate-400 mb-3">Once you delete your account, there is no going back. All data will be permanently removed.</p>
+                                <button class="text-xs bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition">Delete Account</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODULE 5: WATCHLIST MODAL ==================== -->
+    <div id="watchlistModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center hidden">
+        <div class="glass border border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] overflow-hidden">
+            <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gold/20 flex items-center justify-center">
+                        <i class="fa-solid fa-star text-gold"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Watchlist Management</h2>
+                        <p class="text-xs text-slate-500">Monitor your favorite pairs and timeframes</p>
+                    </div>
+                </div>
+                <button onclick="closeWatchlistModal()" class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
+                <!-- Add to Watchlist -->
+                <div class="flex gap-2 mb-6">
+                    <select id="watchlistAsset" class="flex-1 bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg focus:outline-none focus:border-gold">
+                        <option value="gold-15m">XAU/USD - 15 Minutes</option>
+                        <option value="gold-1h">XAU/USD - 1 Hour</option>
+                        <option value="gold-4h">XAU/USD - 4 Hours</option>
+                        <option value="silver-15m">XAG/USD - 15 Minutes</option>
+                        <option value="silver-1h">XAG/USD - 1 Hour</option>
+                        <option value="silver-4h">XAG/USD - 4 Hours</option>
+                    </select>
+                    <button onclick="addToWatchlist()" class="bg-gold hover:bg-amber-500 text-black px-6 rounded-lg font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Add
+                    </button>
+                </div>
+
+                <!-- Watchlist Items -->
+                <div id="watchlistContainer" class="space-y-2">
+                    <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-gold/30 transition cursor-pointer group" onclick="selectWatchlistItem('gold', '15m')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-lg bg-gold/20 flex items-center justify-center">
+                                <span class="text-gold font-bold text-lg">Au</span>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-white flex items-center gap-2">
+                                    XAU/USD 
+                                    <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">15m</span>
+                                </div>
+                                <div class="text-xs text-slate-500">Gold Spot / US Dollar</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-mono text-white font-bold">2,387.45</div>
+                            <div class="text-xs text-green-400 flex items-center justify-end gap-1">
+                                <i class="fa-solid fa-arrow-up"></i> +0.42%
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            <span class="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] rounded-full font-semibold">BUY</span>
+                            <button onclick="event.stopPropagation(); removeFromWatchlist(this)" class="text-slate-500 hover:text-red-400 p-2 hover:bg-slate-800 rounded-lg transition opacity-0 group-hover:opacity-100">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-gold/30 transition cursor-pointer group" onclick="selectWatchlistItem('silver', '1h')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-lg bg-slate-600/20 flex items-center justify-center">
+                                <span class="text-slate-400 font-bold text-lg">Ag</span>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-white flex items-center gap-2">
+                                    XAG/USD 
+                                    <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">1h</span>
+                                </div>
+                                <div class="text-xs text-slate-500">Silver Spot / US Dollar</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-mono text-white font-bold">28.234</div>
+                            <div class="text-xs text-red-400 flex items-center justify-end gap-1">
+                                <i class="fa-solid fa-arrow-down"></i> -0.18%
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            <span class="px-2 py-1 bg-red-500/20 text-red-400 text-[10px] rounded-full font-semibold">SELL</span>
+                            <button onclick="event.stopPropagation(); removeFromWatchlist(this)" class="text-slate-500 hover:text-red-400 p-2 hover:bg-slate-800 rounded-lg transition opacity-0 group-hover:opacity-100">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-gold/30 transition cursor-pointer group" onclick="selectWatchlistItem('gold', '4h')">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-lg bg-gold/20 flex items-center justify-center">
+                                <span class="text-gold font-bold text-lg">Au</span>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-white flex items-center gap-2">
+                                    XAU/USD 
+                                    <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">4h</span>
+                                </div>
+                                <div class="text-xs text-slate-500">Gold Spot / US Dollar</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-mono text-white font-bold">2,387.45</div>
+                            <div class="text-xs text-green-400 flex items-center justify-end gap-1">
+                                <i class="fa-solid fa-arrow-up"></i> +1.24%
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 ml-4">
+                            <span class="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] rounded-full font-semibold">BUY</span>
+                            <button onclick="event.stopPropagation(); removeFromWatchlist(this)" class="text-slate-500 hover:text-red-400 p-2 hover:bg-slate-800 rounded-lg transition opacity-0 group-hover:opacity-100">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-circle-info text-blue-400 mt-0.5"></i>
+                        <div>
+                            <div class="text-blue-400 text-sm font-semibold">Pro Tip</div>
+                            <p class="text-xs text-slate-400 mt-1">Click on any watchlist item to instantly switch to that asset and timeframe. Your watchlist is saved to your profile.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODULE 8 & 9: BACKTEST MODAL ==================== -->
+    <div id="backtestModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center hidden">
+        <div class="glass border border-slate-700 rounded-2xl w-full max-w-6xl shadow-2xl max-h-[95vh] overflow-hidden">
+            <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                        <i class="fa-solid fa-flask text-blue-400"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Backtest Engine</h2>
+                        <p class="text-xs text-slate-500">Test strategies on historical data (2004-2024)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="exportReport('csv')" class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition" title="Export CSV">
+                        <i class="fa-solid fa-file-csv text-green-400"></i>
+                    </button>
+                    <button onclick="exportReport('pdf')" class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition" title="Export PDF">
+                        <i class="fa-solid fa-file-pdf text-red-400"></i>
+                    </button>
+                    <button onclick="closeBacktestModal()" class="text-slate-400 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto max-h-[calc(95vh-80px)]">
+                <!-- Backtest Configuration -->
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Commodity</label>
+                        <select id="btCommodity" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                            <option value="gold">XAU/USD (Gold)</option>
+                            <option value="silver">XAG/USD (Silver)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Timeframe</label>
+                        <select id="btTimeframe" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                            <option value="5m">5 Minutes</option>
+                            <option value="15m" selected>15 Minutes</option>
+                            <option value="1h">1 Hour</option>
+                            <option value="4h">4 Hours</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Start Date</label>
+                        <input type="date" value="2023-01-01" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">End Date</label>
+                        <input type="date" value="2024-12-31" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Initial Balance ($)</label>
+                        <input type="number" value="10000" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg font-mono">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Risk Per Trade (%)</label>
+                        <input type="number" value="1" step="0.5" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg font-mono">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-400 uppercase mb-1 block">Risk:Reward Ratio</label>
+                        <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2.5 rounded-lg">
+                            <option>1:2</option>
+                            <option selected>1:3</option>
+                            <option>1:4</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="runBacktest()" id="runBacktestBtn" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 mb-6 shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-play"></i> Run Backtest Simulation
+                </button>
+
+                <!-- Backtest Results -->
+                <div id="backtestResults" class="hidden">
+                    <!-- Progress Bar -->
+                    <div id="backtestProgress" class="mb-6 hidden">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">Processing historical data...</span>
+                            <span id="progressPercent" class="text-white font-mono">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div id="progressBar" class="bg-gradient-to-r from-blue-600 to-blue-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics (MODULE 9) -->
+                    <div class="grid grid-cols-5 gap-4 mb-6">
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Accuracy</div>
+                            <div class="text-2xl font-bold text-green-400 font-mono">90.59%</div>
+                            <div class="text-[10px] text-green-400 mt-1">
+                                <i class="fa-solid fa-check"></i> Target: 60-70%
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Sharpe Ratio</div>
+                            <div class="text-2xl font-bold text-green-400 font-mono">3.33</div>
+                            <div class="text-[10px] text-green-400 mt-1">
+                                <i class="fa-solid fa-check"></i> Target: >1.0
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Max Drawdown</div>
+                            <div class="text-2xl font-bold text-green-400 font-mono">-9.26%</div>
+                            <div class="text-[10px] text-green-400 mt-1">
+                                <i class="fa-solid fa-check"></i> Target: ≤20%
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Hit Rate</div>
+                            <div class="text-2xl font-bold text-yellow-400 font-mono">49.5%</div>
+                            <div class="text-[10px] text-yellow-400 mt-1">
+                                <i class="fa-solid fa-minus"></i> Target: >55%
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
+                            <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1">Profit Factor</div>
+                            <div class="text-2xl font-bold text-green-400 font-mono">2.14</div>
+                            <div class="text-[10px] text-slate-400 mt-1">Gross Profit/Loss</div>
+                        </div>
+                    </div>
+
+                    <!-- Equity Curve Chart -->
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700 mb-6">
+                        <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-area text-blue-400"></i> Equity Curve (2023-2024)
+                        </h4>
+                        <div class="h-48 flex items-end gap-1">
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 25%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 28%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 32%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-red-600/60 to-red-400/60 rounded-t" style="height: 30%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 38%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 45%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 52%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-red-600/60 to-red-400/60 rounded-t" style="height: 48%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 58%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 65%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 72%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 78%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-red-600/60 to-red-400/60 rounded-t" style="height: 74%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 82%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 88%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 95%"></div>
+                            <div class="flex-1 bg-gradient-to-t from-green-600/60 to-green-400/60 rounded-t" style="height: 100%"></div>
+                        </div>
+                        <div class="flex justify-between mt-2 text-[10px] text-slate-500">
+                            <span>Jan 2023</span>
+                            <span>Apr 2023</span>
+                            <span>Jul 2023</span>
+                            <span>Oct 2023</span>
+                            <span>Jan 2024</span>
+                            <span>Apr 2024</span>
+                            <span>Jul 2024</span>
+                            <span>Oct 2024</span>
+                        </div>
+                    </div>
+
+                    <!-- Trade Summary & Financial Summary -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                            <h4 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-purple-400"></i> Trade Summary
+                            </h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Total Trades</span>
+                                    <span class="text-white font-mono font-semibold">1,997</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Winning Trades</span>
+                                    <span class="text-green-400 font-mono font-semibold">989</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Losing Trades</span>
+                                    <span class="text-red-400 font-mono font-semibold">1,008</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Avg Win</span>
+                                    <span class="text-green-400 font-mono font-semibold">+$124.50</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Avg Loss</span>
+                                    <span class="text-red-400 font-mono font-semibold">-$58.20</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Largest Win</span>
+                                    <span class="text-green-400 font-mono font-semibold">+$450.00</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Largest Loss</span>
+                                    <span class="text-red-400 font-mono font-semibold">-$100.00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                            <h4 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-sack-dollar text-green-400"></i> Financial Summary
+                            </h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Starting Balance</span>
+                                    <span class="text-white font-mono font-semibold">$10,000.00</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Ending Balance</span>
+                                    <span class="text-green-400 font-mono font-semibold text-lg">$31,554.00</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Net Profit</span>
+                                    <span class="text-green-400 font-mono font-semibold">+$21,554.00</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Total Return</span>
+                                    <span class="text-green-400 font-mono font-semibold">+215.54%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Expectancy per Trade</span>
+                                    <span class="text-green-400 font-mono font-semibold">+$10.79</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Total Commission</span>
+                                    <span class="text-red-400 font-mono font-semibold">-$599.10</span>
+                                </div>
+                                <div class="flex justify-between border-t border-slate-700 pt-2 mt-2">
+                                    <span class="text-white font-semibold">Net Profit After Costs</span>
+                                    <span class="text-green-400 font-mono font-bold text-lg">+$20,954.90</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export Buttons (MODULE 10) -->
+                    <div class="grid grid-cols-3 gap-3">
+                        <button onclick="exportReport('csv')" class="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-file-csv text-green-400 text-lg"></i>
+                            <div class="text-left">
+                                <div class="text-sm">Export CSV</div>
+                                <div class="text-[10px] text-slate-400">Raw trade data</div>
+                            </div>
+                        </button>
+                        <button onclick="exportReport('pdf')" class="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-file-pdf text-red-400 text-lg"></i>
+                            <div class="text-left">
+                                <div class="text-sm">Export PDF</div>
+                                <div class="text-[10px] text-slate-400">Full report</div>
+                            </div>
+                        </button>
+                        <button onclick="exportReport('json')" class="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-file-code text-blue-400 text-lg"></i>
+                            <div class="text-left">
+                                <div class="text-sm">Export JSON</div>
+                                <div class="text-[10px] text-slate-400">API format</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TOP TICKER TAPE ==================== -->
+    <div class="h-8 bg-slate-900/90 border-b border-slate-800 overflow-hidden relative">
+        <div class="ticker-tape flex items-center h-full whitespace-nowrap">
+            <div class="flex items-center space-x-8 px-4 text-xs">
+                <span class="flex items-center gap-2">
+                    <span class="text-gold font-bold">XAU/USD</span>
+                    <span class="text-white font-mono font-bold" id="tickerGold">2,387.45</span>
+                    <span class="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded text-[10px]">+0.42%</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2">
+                    <span class="text-slate-400 font-bold">XAG/USD</span>
+                    <span class="text-white font-mono font-bold" id="tickerSilver">28.234</span>
+                    <span class="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-[10px]">-0.18%</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2">
+                    <span class="text-slate-400 font-bold">DXY</span>
+                    <span class="text-white font-mono">104.52</span>
+                    <span class="text-green-400 text-[10px]">+0.15%</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2 text-amber-400">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>High Impact News: FOMC Minutes @ 14:00 EST</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2">
+                    <span class="text-purple-400 font-semibold">XGBoost Model:</span>
+                    <span class="text-green-400">v3.2.1 Active</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2">
+                    <span class="text-blue-400 font-semibold">Session:</span>
+                    <span class="text-white">NY Open (High Vol)</span>
+                </span>
+            </div>
+            <div class="flex items-center space-x-8 px-4 text-xs">
+                <span class="flex items-center gap-2">
+                    <span class="text-gold font-bold">XAU/USD</span>
+                    <span class="text-white font-mono font-bold">2,387.45</span>
+                    <span class="text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded text-[10px]">+0.42%</span>
+                </span>
+                <span class="text-slate-700">|</span>
+                <span class="flex items-center gap-2">
+                    <span class="text-slate-400 font-bold">XAG/USD</span>
+                    <span class="text-white font-mono font-bold">28.234</span>
+                    <span class="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded text-[10px]">-0.18%</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN NAVIGATION ==================== -->
+    <nav class="h-16 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-gold to-amber-600 flex items-center justify-center shadow-lg shadow-gold/20">
+                    <i class="fa-solid fa-brain text-white text-lg"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-white tracking-tight text-lg">MetalMind</span>
+                    <span class="text-slate-500 font-light ml-1">SMCForge</span>
+                    <div class="text-[9px] text-slate-500 -mt-0.5">Neural Trading Engine v3.2.1</div>
+                </div>
+            </div>
+            
+            <div class="h-8 w-px bg-slate-700"></div>
+
+            <!-- MODULE 4: FORECASTING CONFIGURATION -->
+            <div class="flex bg-slate-800 rounded-lg p-1 space-x-1">
+                <button onclick="selectCommodity('gold')" id="goldBtn" class="commodity-btn px-4 py-1.5 text-xs font-semibold rounded-md bg-gradient-to-r from-gold/20 to-amber-600/20 text-gold border border-gold/30 flex items-center gap-2 transition-all">
+                    <span class="w-2 h-2 rounded-full bg-gold animate-pulse"></span>
+                    XAU/USD
+                </button>
+                <button onclick="selectCommodity('silver')" id="silverBtn" class="commodity-btn px-4 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:bg-slate-700 transition-all flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-600"></span>
+                    XAG/USD
+                </button>
+            </div>
+
+            <!-- Technical Indicators Display -->
+            <div class="flex items-center gap-3 text-xs">
+                <div class="bg-slate-800/50 rounded px-3 py-1.5 border border-slate-700" title="Relative Strength Index">
+                    <span class="text-slate-500">RSI(14):</span>
+                    <span id="navRsi" class="text-green-400 font-mono ml-1 font-bold">32.4</span>
+                </div>
+                <div class="bg-slate-800/50 rounded px-3 py-1.5 border border-slate-700" title="Exponential Moving Average">
+                    <span class="text-slate-500">EMA(20):</span>
+                    <span id="navEma" class="text-white font-mono ml-1 font-bold">2,382.15</span>
+                </div>
+                <div class="bg-slate-800/50 rounded px-3 py-1.5 border border-slate-700" title="Average True Range">
+                    <span class="text-slate-500">ATR(14):</span>
+                    <span id="navAtr" class="text-orange-400 font-mono ml-1 font-bold">18.45</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+            <!-- Timeframe Selection -->
+            <div class="flex bg-slate-800 rounded-lg p-1 space-x-1">
+                <button onclick="selectTimeframe('5m')" class="timeframe-btn px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-700 text-slate-400 transition">5m</button>
+                <button onclick="selectTimeframe('15m')" class="timeframe-btn px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-white border border-slate-600">15m</button>
+                <button onclick="selectTimeframe('1h')" class="timeframe-btn px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-700 text-slate-400 transition">1H</button>
+                <button onclick="selectTimeframe('4h')" class="timeframe-btn px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-700 text-slate-400 transition">4H</button>
+                <button onclick="selectTimeframe('1d')" class="timeframe-btn px-3 py-1.5 text-xs font-medium rounded-md hover:bg-slate-700 text-slate-400 transition">D</button>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center gap-3 bg-slate-800/50 rounded-lg px-4 py-2 border border-slate-700">
+                <div class="text-right">
+                    <div class="text-[10px] text-slate-500 uppercase font-semibold">Market Session</div>
+                    <div id="live-time" class="text-sm text-white font-mono font-bold">14:32:08</div>
+                </div>
+                <div class="w-px h-8 bg-slate-700"></div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-[10px] text-slate-400">System Online</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        <span class="text-[10px] text-slate-400">XGBoost Ready</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="openWatchlistModal()" class="text-slate-400 hover:text-gold p-2.5 hover:bg-slate-800 rounded-lg transition" title="Watchlist">
+                <i class="fa-solid fa-star text-lg"></i>
+            </button>
+            <button class="relative text-slate-400 hover:text-white p-2.5 hover:bg-slate-800 rounded-lg transition" title="Notifications">
+                <i class="fa-solid fa-bell text-lg"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            </button>
+            <button onclick="openSettingsModal()" class="text-slate-400 hover:text-white p-2.5 hover:bg-slate-800 rounded-lg transition" title="Settings">
+                <i class="fa-solid fa-gear text-lg"></i>
+            </button>
+            <div class="relative">
+                <button onclick="toggleUserMenu()" class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm text-white font-bold border-2 border-slate-700 shadow-lg">
+                    JD
+                </button>
+                <div id="userMenu" class="hidden absolute right-0 top-12 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 w-56 z-50">
+                    <div class="px-4 py-3 border-b border-slate-700">
+                        <div class="text-sm text-white font-bold">John Doe</div>
+                        <div class="text-xs text-slate-500">john.doe@trader.com</div>
+                        <div class="text-[10px] text-gold mt-1">Pro Plan</div>
+                    </div>
+                    <button onclick="openSettingsModal()" class="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 flex items-center gap-3 transition">
+                        <i class="fa-solid fa-user w-4"></i> Profile
+                    </button>
+                    <button onclick="openSettingsModal()" class="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 flex items-center gap-3 transition">
+                        <i class="fa-solid fa-gear w-4"></i> Settings
+                    </button>
+                    <button onclick="openBacktestModal()" class="w-full text-left px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 flex items-center gap-3 transition">
+                        <i class="fa-solid fa-flask w-4"></i> Backtest
+                    </button>
+                    <div class="border-t border-slate-700 mt-2 pt-2">
+                        <button onclick="handleLogout()" class="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-slate-700 flex items-center gap-3 transition">
+                            <i class="fa-solid fa-right-from-bracket w-4"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar - Tools -->
+        <aside class="w-14 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-4 space-y-3">
+            <button class="w-10 h-10 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center border border-green-500/30" title="Chart View">
+                <i class="fa-solid fa-chart-line"></i>
+            </button>
+            <button class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition" title="Crosshair">
+                <i class="fa-solid fa-crosshairs"></i>
+            </button>
+            <button class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition" title="Measure">
+                <i class="fa-solid fa-ruler"></i>
+            </button>
+            <button class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition" title="Draw">
+                <i class="fa-solid fa-draw-polygon"></i>
+            </button>
+            <button class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition" title="Fibonacci">
+                <i class="fa-solid fa-percentage"></i>
+            </button>
+            <div class="flex-1"></div>
+            <button class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition" title="Fullscreen">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </aside>
+
+        <!-- Main Chart Area (MODULE 6: INTERACTIVE PREDICTION DASHBOARD) -->
+        <section class="flex-1 relative flex flex-col">
+            <!-- Chart Controls -->
+            <div class="h-12 bg-slate-900/50 border-b border-slate-800 flex items-center justify-between px-4 text-xs">
+                <div class="flex items-center gap-4">
+                    <span class="font-semibold text-white">SMC Overlays:</span>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition">
+                        <input type="checkbox" checked class="accent-green-500 w-3.5 h-3.5 rounded">
+                        <span>Order Blocks</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition">
+                        <input type="checkbox" checked class="accent-purple-500 w-3.5 h-3.5 rounded">
+                        <span>FVG Zones</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition">
+                        <input type="checkbox" checked class="accent-blue-500 w-3.5 h-3.5 rounded">
+                        <span>Liquidity</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition">
+                        <input type="checkbox" checked class="accent-gold w-3.5 h-3.5 rounded">
+                        <span>BOS/CHoCH</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:text-white transition">
+                        <input type="checkbox" checked class="accent-cyan-500 w-3.5 h-3.5 rounded">
+                        <span>CVD</span>
+                    </label>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-sm bg-green-500/20 border border-green-500/50"></span>
+                        <span class="text-slate-400">Bullish OB</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-sm bg-red-500/20 border border-red-500/50"></span>
+                        <span class="text-slate-400">Bearish OB</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-sm bg-purple-500/20 border border-purple-500/50"></span>
+                        <span class="text-slate-400">FVG</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Canvas -->
+            <div class="flex-1 relative chart-grid overflow-hidden">
+                
+                <!-- Price Scale (Right) -->
+                <div class="absolute right-0 top-0 bottom-0 w-20 bg-slate-900/90 border-l border-slate-800 z-10 flex flex-col justify-between py-4 text-[10px] font-mono text-slate-400">
+                    <span class="pr-3 text-right">2,395.00</span>
+                    <span class="pr-3 text-right">2,392.50</span>
+                    <span class="pr-3 text-right">2,390.00</span>
+                    <span class="pr-3 text-right text-green-400 font-bold bg-green-500/10 py-1">2,387.45</span>
+                    <span class="pr-3 text-right">2,385.00</span>
+                    <span class="pr-3 text-right">2,382.50</span>
+                    <span class="pr-3 text-right">2,380.00</span>
+                </div>
+
+                <!-- Time Scale (Bottom) -->
+                <div class="absolute bottom-0 left-0 right-20 h-6 bg-slate-900/90 border-t border-slate-800 z-10 flex items-center justify-around text-[10px] font-mono text-slate-500">
+                    <span>14:00</span>
+                    <span>14:15</span>
+                    <span>14:30</span>
+                    <span class="text-white font-bold">14:45</span>
+                    <span>15:00</span>
+                    <span>15:15</span>
+                </div>
+
+                <!-- MODULE 6: LIVE SIGNAL CARD -->
+                <div class="absolute top-4 left-4 glass border border-green-500/30 rounded-xl p-5 shadow-2xl z-20 w-80 gradient-border">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500/20">
+                                <i class="fa-solid fa-signal text-green-400"></i>
+                            </span>
+                            <div>
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">AI Signal</span>
+                                <div class="text-[9px] text-slate-500">XGBoost v3.2.1</div>
+                            </div>
+                        </div>
+                        <span class="flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full border border-green-500/30">
+                            <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                            Live
+                        </span>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <div id="signalDirection" class="text-4xl font-bold text-white tracking-tight">BUY</div>
+                            <i id="signalIcon" class="fa-solid fa-arrow-trend-up text-3xl text-green-400"></i>
+                        </div>
+                        <div class="flex-1 text-right">
+                            <div class="text-[10px] text-slate-400">Entry Price</div>
+                            <div id="entryPrice" class="text-xl font-mono text-white font-bold">2,387.45</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                        <div class="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+                            <div class="text-[9px] text-slate-500 uppercase">Stop Loss</div>
+                            <div id="slPrice" class="text-sm font-mono text-red-400 font-bold">2,375.20</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+                            <div class="text-[9px] text-slate-500 uppercase">TP 1</div>
+                            <div id="tp1Price" class="text-sm font-mono text-green-400 font-bold">2,395.80</div>
+                        </div>
+                        <div class="bg-slate-800/50 rounded-lg p-2 border border-slate-700">
+                            <div class="text-[9px] text-slate-500 uppercase">TP 2</div>
+                            <div id="tp2Price" class="text-sm font-mono text-green-400 font-bold">2,410.50</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="flex justify-between mb-1.5">
+                            <span class="text-xs text-slate-400 flex items-center gap-1">
+                                <i class="fa-solid fa-brain text-purple-400 text-[10px]"></i>
+                                ML Confidence
+                            </span>
+                            <span id="confidenceValue" class="text-sm font-mono font-bold text-green-400">90.59%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div id="confidenceBar" class="bg-gradient-to-r from-green-600 via-green-500 to-emerald-400 h-full rounded-full transition-all duration-1000" style="width: 90.59%"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button class="flex-1 bg-green-500 hover:bg-green-400 text-white text-xs py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-green-500/25">
+                            <i class="fa-solid fa-rocket"></i> Execute Trade
+                        </button>
+                        <button class="px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-3 rounded-lg transition">
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- MTF Analysis Panel -->
+                <div class="absolute top-4 right-24 glass border border-slate-700 rounded-xl p-4 shadow-xl z-20 w-60">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-xs font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-layer-group text-blue-400"></i> MTF Confluence
+                        </h4>
+                        <span class="text-[10px] text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded-full">4/5 Aligned</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between p-2 bg-slate-800/30 rounded">
+                            <span class="text-xs text-slate-400 font-mono">15m</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-green-400">Bullish OB</span>
+                                <i class="fa-solid fa-arrow-up text-green-400 text-[10px]"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-slate-800/30 rounded">
+                            <span class="text-xs text-slate-400 font-mono">1H</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-green-400">FVG Fill</span>
+                                <i class="fa-solid fa-arrow-up text-green-400 text-[10px]"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-slate-800/30 rounded">
+                            <span class="text-xs text-slate-400 font-mono">4H</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-green-400">BOS</span>
+                                <i class="fa-solid fa-arrow-up text-green-400 text-[10px]"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-slate-800/30 rounded">
+                            <span class="text-xs text-slate-400 font-mono">Daily</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-yellow-400">Neutral</span>
+                                <i class="fa-solid fa-minus text-yellow-400 text-[10px]"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-2 bg-slate-800/30 rounded">
+                            <span class="text-xs text-slate-400 font-mono">Weekly</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-green-400">Premium</span>
+                                <i class="fa-solid fa-arrow-up text-green-400 text-[10px]"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SMC Chart Elements -->
+                
+                <!-- Bearish Order Block -->
+                <div class="absolute order-block-bearish rounded-r-lg" style="top: 15%; left: 5%; width: 35%; height: 50px;">
+                    <div class="absolute -top-5 left-2 text-[9px] text-red-400 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-cube"></i> BEARISH OB (4H)
+                    </div>
+                </div>
+
+                <!-- Bullish Order Block -->
+                <div class="absolute order-block-bullish rounded-r-lg" style="bottom: 25%; left: 10%; width: 25%; height: 40px;">
+                    <div class="absolute -top-5 left-2 text-[9px] text-green-400 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-cube"></i> BULLISH OB (1H)
+                    </div>
+                </div>
+
+                <!-- FVG Zone -->
+                <div class="absolute fvg-zone" style="top: 35%; left: 30%; width: 60%; height: 45px;">
+                    <div class="absolute -top-4 right-4 text-[9px] text-purple-400 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-vector-square"></i> FAIR VALUE GAP (Unfilled)
+                    </div>
+                </div>
+
+                <!-- BOS Line -->
+                <div class="absolute bos-line" style="top: 50%; left: 0; width: 80%;"></div>
+                <div class="absolute bg-gold/20 text-gold text-[10px] px-2 py-0.5 rounded font-bold border border-gold/30" style="top: 48%; left: 75%;">
+                    <i class="fa-solid fa-arrow-right-arrow-left mr-1"></i>BOS
+                </div>
+
+                <!-- CHoCH Line -->
+                <div class="absolute choch-line" style="top: 65%; left: 20%; width: 50%;"></div>
+                <div class="absolute bg-cyan-500/20 text-cyan-400 text-[10px] px-2 py-0.5 rounded font-bold border border-cyan-500/30" style="top: 63%; left: 60%;">
+                    <i class="fa-solid fa-repeat mr-1"></i>CHoCH
+                </div>
+
+                <!-- Liquidity Pools -->
+                <div class="absolute" style="bottom: 15%; left: 40%;">
+                    <div class="flex items-center gap-1">
+                        <div class="w-16 h-0.5 bg-gradient-to-r from-yellow-500/80 to-transparent"></div>
+                        <span class="text-[9px] text-yellow-500 font-bold">SSL ($$$)</span>
+                    </div>
+                </div>
+
+                <div class="absolute" style="top: 12%; right: 25%;">
+                    <div class="flex items-center gap-1">
+                        <span class="text-[9px] text-yellow-500 font-bold">BSL ($$$)</span>
+                        <div class="w-16 h-0.5 bg-gradient-to-l from-yellow-500/80 to-transparent"></div>
+                    </div>
+                </div>
+
+                <!-- Liquidity Sweep Marker -->
+                <div class="absolute text-center" style="bottom: 30%; left: 55%;">
+                    <div class="relative">
+                        <i class="fa-solid fa-crosshairs text-gold text-2xl animate-pulse"></i>
+                        <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] text-gold font-bold whitespace-nowrap bg-gold/10 px-2 py-0.5 rounded border border-gold/30">
+                            LIQ SWEEP ✓
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Candlesticks -->
+                <div class="absolute flex items-end gap-1" style="bottom: 35%; left: 15%;">
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-6 bg-red-500"></div>
+                        <div class="candle-red w-3 h-10 rounded-sm"></div>
+                        <div class="w-0.5 h-4 bg-red-500"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-8 bg-red-500"></div>
+                        <div class="candle-red w-3 h-12 rounded-sm"></div>
+                        <div class="w-0.5 h-3 bg-red-500"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-4 bg-green-500"></div>
+                        <div class="candle-green w-3 h-6 rounded-sm"></div>
+                        <div class="w-0.5 h-8 bg-green-500"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-3 bg-green-500"></div>
+                        <div class="candle-green w-3 h-14 rounded-sm"></div>
+                        <div class="w-0.5 h-4 bg-green-500"></div>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-0.5 h-6 bg-green-500"></div>
+                        <div class="candle-green w-3 h-10 rounded-sm animate-pulse"></div>
+                        <div class="w-0.5 h-2 bg-green-500"></div>
+                    </div>
+                </div>
+
+                <!-- Premium/Discount Zones -->
+                <div class="absolute right-24 top-0 bottom-6 w-1 flex flex-col">
+                    <div class="flex-1 bg-gradient-to-b from-red-500/20 to-transparent relative">
+                        <span class="absolute top-2 -left-20 text-[8px] text-red-400 font-bold bg-red-500/10 px-2 py-0.5 rounded">PREMIUM ZONE</span>
+                    </div>
+                    <div class="h-px bg-slate-600 relative">
+                        <span class="absolute top-0 -left-8 text-[8px] text-slate-400 bg-slate-800 px-1">50%</span>
+                    </div>
+                    <div class="flex-1 bg-gradient-to-t from-green-500/20 to-transparent relative">
+                        <span class="absolute bottom-2 -left-20 text-[8px] text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded">DISCOUNT ZONE</span>
+                    </div>
+                </div>
+
+                <!-- Current Price Line -->
+                <div class="absolute left-0 right-20 flex items-center z-10" style="top: 45%;">
+                    <div class="flex-1 border-t border-green-500 border-dashed"></div>
+                    <div class="bg-green-500 text-white text-xs px-4 py-1.5 font-mono font-bold rounded-l-lg shadow-lg shadow-green-500/30 flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                        2,387.45
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Stats Bar -->
+            <div class="h-28 bg-slate-900/90 border-t border-slate-800 grid grid-cols-6 divide-x divide-slate-800">
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">Trading Session</div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <span class="text-white font-bold text-sm">New York</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-1">High Volatility Expected</div>
+                </div>
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">ATR (14)</div>
+                    <div class="text-white font-mono font-bold text-xl">18.45</div>
+                    <div class="flex items-center gap-1 text-[10px] text-orange-400">
+                        <i class="fa-solid fa-fire"></i> High Volatility
+                    </div>
+                </div>
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">CVD (Cumulative)</div>
+                    <div class="text-green-400 font-mono font-bold text-xl">+2,847</div>
+                    <div class="text-[10px] text-slate-400">Bullish Pressure</div>
+                </div>
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">RSI (14)</div>
+                    <div class="text-green-400 font-mono font-bold text-xl">32.4</div>
+                    <div class="text-[10px] text-green-400">Oversold Zone</div>
+                </div>
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">EMA Cross</div>
+                    <div class="text-green-400 font-mono font-bold text-xl">Bullish</div>
+                    <div class="text-[10px] text-slate-400">20 > 50 EMA</div>
+                </div>
+                <div class="p-4 flex flex-col justify-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wide mb-1 font-semibold">Market Structure</div>
+                    <div class="text-green-400 font-mono font-bold text-xl">HH/HL</div>
+                    <div class="text-[10px] text-green-400">Uptrend</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Sidebar (MODULE 7: MODEL EXPLAINABILITY) -->
+        <aside class="w-80 bg-slate-900 flex flex-col border-l border-slate-800 overflow-y-auto">
+            
+            <!-- MODULE 7: SHAP EXPLAINABILITY PANEL -->
+            <div class="p-4 border-b border-slate-800">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                            <i class="fa-solid fa-robot text-purple-400 text-xs"></i>
+                        </div>
+                        Model Explainability
+                    </div>
+                    <span class="text-[10px] text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/30">SHAP</span>
+                </h3>
+                
+                <div class="glass rounded-lg p-3 border border-slate-700 mb-3 bg-slate-800/30">
+                    <div class="text-[10px] text-slate-500 mb-2 uppercase tracking-wide font-semibold">XGBoost Reasoning</div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        <span class="text-green-400 font-bold">Strong bullish bias detected.</span> Price swept sell-side liquidity at 2,375.20 and reacted from a 1H bullish order block. The 15m FVG remains unfilled, providing next target. RSI oversold supports reversal.
+                    </p>
+                </div>
+
+                <div class="text-xs text-slate-500 mb-2 flex items-center gap-1 font-semibold">
+                    <i class="fa-solid fa-chart-bar text-purple-400"></i> Feature Importance (SHAP)
+                </div>
+                
+                <div class="space-y-2.5">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                RSI Oversold (< 30)
+                            </span>
+                            <span class="text-green-400 font-mono font-bold">+0.48</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full" style="width: 92%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                Bullish OB Reaction
+                            </span>
+                            <span class="text-green-400 font-mono font-bold">+0.35</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                FVG Detected (Unfilled)
+                            </span>
+                            <span class="text-green-400 font-mono font-bold">+0.28</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full" style="width: 60%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                Liquidity Sweep SSL
+                            </span>
+                            <span class="text-green-400 font-mono font-bold">+0.22</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full" style="width: 48%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                CVD Positive Divergence
+                            </span>
+                            <span class="text-green-400 font-mono font-bold">+0.18</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-green-600 to-green-400 h-full rounded-full" style="width: 38%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                High ATR (Volatility)
+                            </span>
+                            <span class="text-red-400 font-mono font-bold">-0.12</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-red-600 to-red-400 h-full rounded-full" style="width: 25%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Calculator -->
+            <div class="p-4 border-b border-slate-800 bg-slate-850/50">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-gold/20 flex items-center justify-center">
+                        <i class="fa-solid fa-calculator text-gold text-xs"></i>
+                    </div>
+                    Position Calculator
+                </h3>
+                
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-semibold">Account Balance</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs">$</span>
+                            <input type="number" value="25000" class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2 pl-6 rounded-lg focus:outline-none focus:border-gold font-mono">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-slate-500 uppercase mb-1 block font-semibold">Risk Per Trade</label>
+                        <select class="w-full bg-slate-900 border border-slate-700 text-white text-sm p-2 rounded-lg focus:outline-none focus:border-gold font-mono">
+                            <option>0.5%</option>
+                            <option selected>1.0%</option>
+                            <option>1.5%</option>
+                            <option>2.0%</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-4 border border-slate-700">
+                    <div class="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase mb-1 font-semibold">Stop Loss</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-white font-mono text-sm font-bold">12.25</span>
+                                <span class="text-[10px] text-slate-500">pips</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase mb-1 font-semibold">Risk Amount</div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-red-400 font-mono text-sm font-bold">$250.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase mb-1 font-semibold">TP 1 (1:2)</div>
+                            <div class="text-green-400 font-mono text-sm font-bold">+$500</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] text-slate-500 uppercase mb-1 font-semibold">TP 2 (1:3)</div>
+                            <div class="text-green-400 font-mono text-sm font-bold">+$750</div>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-slate-700 my-3"></div>
+
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="text-xs text-slate-400">Recommended</span>
+                            <span class="text-xs font-bold text-gold ml-1">Lot Size</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-3xl font-bold text-white font-mono">0.82</span>
+                            <span class="text-slate-500 text-sm">lots</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODULE 9: PERFORMANCE STATS PREVIEW -->
+            <div class="p-4 border-b border-slate-800">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                            <i class="fa-solid fa-chart-pie text-blue-400 text-xs"></i>
+                        </div>
+                        Model Performance
+                    </div>
+                    <span class="text-[10px] text-slate-500">Rolling 30D</span>
+                </h3>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700">
+                        <div class="text-2xl font-bold text-green-400 font-mono">90.59%</div>
+                        <div class="text-[10px] text-slate-500 uppercase font-semibold">Accuracy</div>
+                        <div class="text-[9px] text-green-400 mt-1">Target: 60-70%</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700">
+                        <div class="text-2xl font-bold text-green-400 font-mono">3.33</div>
+                        <div class="text-[10px] text-slate-500 uppercase font-semibold">Sharpe Ratio</div>
+                        <div class="text-[9px] text-green-400 mt-1">Target: >1.0</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700">
+                        <div class="text-xl font-bold text-green-400 font-mono">-9.26%</div>
+                        <div class="text-[10px] text-slate-500 uppercase font-semibold">Max Drawdown</div>
+                        <div class="text-[9px] text-green-400 mt-1">Target: ≤20%</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700">
+                        <div class="text-xl font-bold text-yellow-400 font-mono">49.5%</div>
+                        <div class="text-[10px] text-slate-500 uppercase font-semibold">Hit Rate</div>
+                        <div class="text-[9px] text-yellow-400 mt-1">Target: >55%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Log -->
+            <div class="p-4 flex-1">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center">
+                            <i class="fa-solid fa-clock-rotate-left text-slate-400 text-xs"></i>
+                        </div>
+                        Signal History
+                    </div>
+                    <button class="text-[10px] text-blue-400 hover:text-blue-300 transition font-semibold">View All</button>
+                </h3>
+                
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/20 cursor-pointer hover:bg-green-500/10 transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                                <i class="fa-solid fa-arrow-up text-green-400 text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white">XAU/USD <span class="text-[10px] text-slate-500 font-normal ml-1">15m</span></div>
+                                <div class="text-[10px] text-green-400 font-semibold">Winner +$312.50 (+3.1R)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-500">10:32 AM</div>
+                            <span class="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold">BUY</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 cursor-pointer hover:bg-red-500/10 transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                                <i class="fa-solid fa-arrow-down text-red-400 text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white">XAG/USD <span class="text-[10px] text-slate-500 font-normal ml-1">1H</span></div>
+                                <div class="text-[10px] text-red-400 font-semibold">Loss -$100.00 (-1.0R)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-500">09:15 AM</div>
+                            <span class="bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded-full font-bold">SELL</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 rounded-lg bg-green-500/5 border border-green-500/20 cursor-pointer hover:bg-green-500/10 transition">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                                <i class="fa-solid fa-arrow-up text-green-400 text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-xs font-bold text-white">XAU/USD <span class="text-[10px] text-slate-500 font-normal ml-1">4H</span></div>
+                                <div class="text-[10px] text-green-400 font-semibold">Winner +$425.00 (+2.5R)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-500">08:00 AM</div>
+                            <span class="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold">BUY</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="p-4 border-t border-slate-800 space-y-2">
+                <button onclick="openBacktestModal()" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs py-3 rounded-lg font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25">
+                    <i class="fa-solid fa-flask"></i> Open Backtest Engine
+                </button>
+                <button onclick="exportReport('pdf')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2.5 rounded-lg border border-slate-700 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-export"></i> Export Performance Report
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer class="h-10 bg-slate-950 border-t border-slate-800 flex items-center justify-between px-4 text-[10px] text-slate-500">
+        <div class="flex items-center gap-6">
+            <span class="flex items-center gap-2">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                Server: <span class="text-green-400 font-bold">US-East-1</span>
+            </span>
+            <span>Latency: <span class="text-white font-mono">23ms</span></span>
+            <span>API: <span class="text-green-400 font-bold">Connected</span></span>
+            <span>Model: <span class="text-purple-400 font-bold">XGBoost v3.2.1</span></span>
+            <span>Data: <span class="text-blue-400 font-bold">Kaggle 2004-2024</span></span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span>Risk:Reward: <span class="text-gold font-bold">1:3</span></span>
+            <span class="text-slate-700">|</span>
+            <span>© 2024 MetalMind SMCForge - Neural Trading Engine</span>
+        </div>
+    </footer>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        // ============ STATE MANAGEMENT ============
+        let currentCommodity = 'gold';
+        let currentTimeframe = '15m';
+        let isLoggedIn = false;
+
+        // ============ INITIALIZATION ============
+        document.addEventListener('DOMContentLoaded', function() {
+            updateClock();
+            setInterval(updateClock, 1000);
+            setInterval(simulatePriceUpdate, 3000);
+        });
+
+        // ============ MODULE 1: AUTHENTICATION ============
+        function switchAuthTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const loginTabBtn = document.getElementById('loginTabBtn');
+            const signupTabBtn = document.getElementById('signupTabBtn');
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                loginTabBtn.classList.add('bg-slate-700', 'text-white');
+                loginTabBtn.classList.remove('text-slate-400');
+                signupTabBtn.classList.remove('bg-slate-700', 'text-white');
+                signupTabBtn.classList.add('text-slate-400');
+            } else {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                signupTabBtn.classList.add('bg-slate-700', 'text-white');
+                signupTabBtn.classList.remove('text-slate-400');
+                loginTabBtn.classList.remove('bg-slate-700', 'text-white');
+                loginTabBtn.classList.add('text-slate-400');
+            }
+        }
+
+        function handleLogin() {
+            document.getElementById('authModal').classList.add('hidden');
+            isLoggedIn = true;
+            showNotification('Welcome back, John! Dashboard loaded.', 'success');
+        }
+
+        function handleSignup() {
+            document.getElementById('authModal').classList.add('hidden');
+            isLoggedIn = true;
+            showNotification('Account created successfully! Welcome to MetalMind.', 'success');
+        }
+
+        function handleLogout() {
+            isLoggedIn = false;
+            document.getElementById('authModal').classList.remove('hidden');
+            document.getElementById('userMenu').classList.add('hidden');
+            showNotification('Logged out successfully.', 'info');
+        }
+
+        function toggleUserMenu() {
+            document.getElementById('userMenu').classList.toggle('hidden');
+        }
+
+        // ============ MODULE 2: SETTINGS ============
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.getElementById('userMenu').classList.add('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function switchSettingsTab(tab) {
+            document.querySelectorAll('.settings-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tab + 'Tab').classList.remove('hidden');
+            
+            document.querySelectorAll('.settings-tab').forEach(btn => {
+                btn.classList.remove('bg-slate-800', 'text-white');
+                btn.classList.add('text-slate-400');
+            });
+            document.querySelector(`.settings-tab[data-tab="${tab}"]`).classList.add('bg-slate-800', 'text-white');
+            document.querySelector(`.settings-tab[data-tab="${tab}"]`).classList.remove('text-slate-400');
+        }
+
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            const toggle = document.getElementById('themeToggle');
+            const toggleDot = toggle.querySelector('div');
+            
+            if (document.documentElement.classList.contains('dark')) {
+                toggleDot.style.transform = 'translateX(0)';
+                toggleDot.innerHTML = '<i class="fa-solid fa-moon text-[10px] text-black"></i>';
+                toggle.classList.remove('bg-slate-400');
+                toggle.classList.add('bg-slate-700');
+            } else {
+                toggleDot.style.transform = 'translateX(28px)';
+                toggleDot.innerHTML = '<i class="fa-solid fa-sun text-[10px] text-black"></i>';
+                toggle.classList.remove('bg-slate-700');
+                toggle.classList.add('bg-slate-400');
+            }
+        }
+
+        // ============ MODULE 4: FORECASTING CONFIGURATION ============
+        function selectCommodity(commodity) {
+            currentCommodity = commodity;
+            
+            document.querySelectorAll('.commodity-btn').forEach(btn => {
+                btn.classList.remove('bg-gradient-to-r', 'from-gold/20', 'to-amber-600/20', 'text-gold', 'border', 'border-gold/30');
+                btn.classList.add('text-slate-400');
+                btn.querySelector('span').classList.remove('bg-gold', 'animate-pulse');
+                btn.querySelector('span').classList.add('bg-slate-600');
+            });
+
+            const activeBtn = document.getElementById(commodity + 'Btn');
+            activeBtn.classList.add('bg-gradient-to-r', 'from-gold/20', 'to-amber-600/20', 'text-gold', 'border', 'border-gold/30');
+            activeBtn.classList.remove('text-slate-400');
+            activeBtn.querySelector('span').classList.add('bg-gold', 'animate-pulse');
+            activeBtn.querySelector('span').classList.remove('bg-slate-600');
+
+            updatePrediction();
+            showNotification(`Switched to ${commodity === 'gold' ? 'XAU/USD (Gold)' : 'XAG/USD (Silver)'}`, 'info');
+        }
+
+        function selectTimeframe(tf) {
+            currentTimeframe = tf;
+            
+            document.querySelectorAll('.timeframe-btn').forEach(btn => {
+                btn.classList.remove('bg-slate-700', 'text-white', 'border', 'border-slate-600');
+                btn.classList.add('text-slate-400');
+            });
+
+            event.target.classList.add('bg-slate-700', 'text-white', 'border', 'border-slate-600');
+            event.target.classList.remove('text-slate-400');
+
+            updatePrediction();
+            showNotification(`Timeframe changed to ${tf}`, 'info');
+        }
+
+        // ============ MODULE 5: WATCHLIST ============
+        function openWatchlistModal() {
+            document.getElementById('watchlistModal').classList.remove('hidden');
+        }
+
+        function closeWatchlistModal() {
+            document.getElementById('watchlistModal').classList.add('hidden');
+        }
+
+        function addToWatchlist() {
+            const select = document.getElementById('watchlistAsset');
+            const value = select.value;
+            const [asset, tf] = value.split('-');
+            
+            const container = document.getElementById('watchlistContainer');
+            const newItem = document.createElement('div');
+            newItem.className = 'flex items-center justify-between p-4 bg-slate-800/50 rounded-lg border border-slate-700 hover:border-gold/30 transition cursor-pointer group';
+            newItem.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-lg ${asset === 'gold' ? 'bg-gold/20' : 'bg-slate-600/20'} flex items-center justify-center">
+                        <span class="${asset === 'gold' ? 'text-gold' : 'text-slate-400'} font-bold text-lg">${asset === 'gold' ? 'Au' : 'Ag'}</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-semibold text-white flex items-center gap-2">
+                            ${asset === 'gold' ? 'XAU/USD' : 'XAG/USD'}
+                            <span class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded">${tf}</span>
+                        </div>
+                        <div class="text-xs text-slate-500">${asset === 'gold' ? 'Gold Spot / US Dollar' : 'Silver Spot / US Dollar'}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-lg font-mono text-white font-bold">${asset === 'gold' ? '2,387.45' : '28.234'}</div>
+                    <div class="text-xs text-green-400 flex items-center justify-end gap-1">
+                        <i class="fa-solid fa-arrow-up"></i> +0.42%
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 ml-4">
+                    <span class="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] rounded-full font-semibold">BUY</span>
+                    <button onclick="event.stopPropagation(); removeFromWatchlist(this)" class="text-slate-500 hover:text-red-400 p-2 hover:bg-slate-800 rounded-lg transition opacity-0 group-hover:opacity-100">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(newItem);
+            showNotification('Added to watchlist', 'success');
+        }
+
+        function removeFromWatchlist(btn) {
+            btn.closest('.flex').remove();
+            showNotification('Removed from watchlist', 'info');
+        }
+
+        function selectWatchlistItem(asset, tf) {
+            selectCommodity(asset);
+            closeWatchlistModal();
+            showNotification(`Loaded ${asset.toUpperCase()} ${tf} from watchlist`, 'info');
+        }
+
+        // ============ MODULE 8 & 9: BACKTEST ============
+        function openBacktestModal() {
+            document.getElementById('backtestModal').classList.remove('hidden');
+        }
+
+        function closeBacktestModal() {
+            document.getElementById('backtestModal').classList.add('hidden');
+        }
+
+        function runBacktest() {
+            const btn = document.getElementById('runBacktestBtn');
+            const progress = document.getElementById('backtestProgress');
+            const results = document.getElementById('backtestResults');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing 20 Years of Data...';
+            
+            results.classList.remove('hidden');
+            progress.classList.remove('hidden');
+
+            let percent = 0;
+            const interval = setInterval(() => {
+                percent += Math.random() * 12;
+                if (percent >= 100) {
+                    percent = 100;
+                    clearInterval(interval);
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Backtest Simulation';
+                    progress.classList.add('hidden');
+                    
+                    showNotification('Backtest completed! 90.59% accuracy achieved.', 'success');
+                }
+                progressBar.style.width = percent + '%';
+                progressPercent.textContent = Math.round(percent) + '%';
+            }, 150);
+        }
+
+        // ============ MODULE 10: EXPORT REPORTS ============
+        function exportReport(format) {
+            showNotification(`Preparing ${format.toUpperCase()} export...`, 'info');
+            
+            setTimeout(() => {
+                showNotification(`${format.toUpperCase()} report downloaded successfully!`, 'success');
+            }, 1500);
+        }
+
+        // ============ PREDICTION UPDATE ============
+        function updatePrediction() {
+            const predictions = [
+                { direction: 'BUY', confidence: 90.59, icon: 'fa-arrow-trend-up', color: 'green' },
+                { direction: 'SELL', confidence: 85.2, icon: 'fa-arrow-trend-down', color: 'red' },
+                { direction: 'BUY', confidence: 78.9, icon: 'fa-arrow-trend-up', color: 'green' },
+            ];
+            
+            const pred = predictions[Math.floor(Math.random() * predictions.length)];
+            
+            document.getElementById('signalDirection').textContent = pred.direction;
+            document.getElementById('signalIcon').className = `fa-solid ${pred.icon} text-3xl text-${pred.color}-400`;
+            document.getElementById('confidenceValue').textContent = pred.confidence + '%';
+            document.getElementById('confidenceBar').style.width = pred.confidence + '%';
+        }
+
+        // ============ CLOCK ============
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            document.getElementById('live-time').textContent = timeStr;
+        }
+
+        // ============ PRICE SIMULATION ============
+        function simulatePriceUpdate() {
+            const goldPrice = (2385 + Math.random() * 10).toFixed(2);
+            const silverPrice = (28 + Math.random() * 0.5).toFixed(3);
+            
+            const goldEl = document.getElementById('tickerGold');
+            const silverEl = document.getElementById('tickerSilver');
+            
+            if (goldEl) goldEl.textContent = goldPrice;
+            if (silverEl) silverEl.textContent = silverPrice;
+            
+            document.getElementById('navRsi').textContent = (30 + Math.random() * 10).toFixed(1);
+            document.getElementById('navEma').textContent = (2380 + Math.random() * 5).toFixed(2);
+            document.getElementById('navAtr').textContent = (17 + Math.random() * 3).toFixed(2);
+        }
+
+        // ============ NOTIFICATIONS ============
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500/95 border-green-400',
+                error: 'bg-red-500/95 border-red-400',
+                info: 'bg-blue-500/95 border-blue-400',
+                warning: 'bg-yellow-500/95 border-yellow-400'
+            };
+            
+            notification.className = `fixed top-24 right-4 ${colors[type]} text-white px-5 py-3 rounded-lg shadow-2xl z-50 border flex items-center gap-3 font-medium`;
+            
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                info: 'fa-circle-info',
+                warning: 'fa-triangle-exclamation'
+            };
+            
+            notification.innerHTML = `<i class="fa-solid ${icons[type]} text-lg"></i> ${message}`;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100px)';
+                notification.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3500);
+        }
+
+        // ============ KEYBOARD SHORTCUTS ============
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSettingsModal();
+                closeBacktestModal();
+                closeWatchlistModal();
+            }
+            if (e.key === 'b' && e.ctrlKey) {
+                e.preventDefault();
+                openBacktestModal();
+            }
+            if (e.key === 's' && e.ctrlKey) {
+                e.preventDefault();
+                openSettingsModal();
+            }
+        });
+
+        // Close modals when clicking outside
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+        });
+
+        // Close user menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const userMenu = document.getElementById('userMenu');
+            if (!e.target.closest('.relative') && !userMenu.classList.contains('hidden')) {
+                userMenu.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

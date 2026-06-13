@@ -21,24 +21,24 @@ import os
 # Import database models and email service
 from api.app.database import db, User, Session as DBSession, OTPCode, WatchlistItem
 from api.app.services.email_service import email_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 bcrypt = Bcrypt()
 
-# Configuration (use environment variables in production)
-# FIXED: Validate SECRET_KEY properly
-SECRET_KEY = os.environ.get('SECRET_KEY')
-if not SECRET_KEY or SECRET_KEY == 'your-secret-key-change-in-production-2024':
-    import sys
+# FIXED: Use centralized security service for SECRET_KEY validation
+from api.app.services.security_service import security_service
+from api.app.services.password_service import password_service
+
+SECRET_KEY = security_service.validate_secret_key()
+_refresh_secret = os.environ.get('REFRESH_SECRET_KEY')
+if not _refresh_secret:
     if os.environ.get('FLASK_ENV') == 'production':
-        print("❌ CRITICAL: SECRET_KEY must be set in production!")
-        print("   Set environment variable: export SECRET_KEY='your-strong-random-key'")
-        sys.exit(1)
-    else:
-        import logging
-        logging.warning("⚠️  Using default SECRET_KEY - DO NOT USE IN PRODUCTION!")
-        SECRET_KEY = 'dev-secret-key-only-for-development-123'
-REFRESH_SECRET_KEY = os.environ.get('REFRESH_SECRET_KEY', 'your-refresh-secret-key-2024')
+        raise RuntimeError("REFRESH_SECRET_KEY environment variable must be set in production")
+    _refresh_secret = 'dev-refresh-secret-not-for-production'
+REFRESH_SECRET_KEY = _refresh_secret
 ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
 REFRESH_TOKEN_EXPIRY = timedelta(days=7)
 OTP_EXPIRY = timedelta(minutes=10)
@@ -53,30 +53,14 @@ limiter = Limiter(
 
 # ==================== HELPER FUNCTIONS ====================
 
-def validate_email(email):
-    """Validate email format."""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
+# REMOVED: Duplicate email validation - now using validation_service
+from api.app.services.validation_service import validation_service
 
 
-def validate_password_strength(password):
-    """Validate password strength."""
-    if len(password) < 8:
-        return False, "Password must be at least 8 characters long"
-    if not re.search(r'[A-Z]', password):
-        return False, "Password must contain at least one uppercase letter"
-    if not re.search(r'[a-z]', password):
-        return False, "Password must contain at least one lowercase letter"
-    if not re.search(r'[0-9]', password):
-        return False, "Password must contain at least one number"
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        return False, "Password must contain at least one special character"
-    return True, "Password is strong"
+# REMOVED: Duplicate password validation - now using password_service
 
 
-def generate_otp():
-    """Generate 6-digit OTP."""
-    return str(secrets.randbelow(1000000)).zfill(6)
+# REMOVED: Duplicate OTP generation - now using security_service
 
 
 def create_access_token(email):
@@ -162,11 +146,13 @@ def register():
         if not email or not password:
             return jsonify({'error': 'Email and password are required'}), 400
         
-        if not validate_email(email):
-            return jsonify({'error': 'Invalid email format'}), 400
+        # FIXED: Use centralized validation service
+        is_valid, error_msg = validation_service.validate_email(email)
+        if not is_valid:
+            return jsonify({'error': error_msg}), 400
         
-        # Check password strength
-        is_strong, message = validate_password_strength(password)
+        # FIXED: Use centralized password service
+        is_strong, message = password_service.validate_strength(password)
         if not is_strong:
             return jsonify({'error': message}), 400
         
@@ -175,8 +161,8 @@ def register():
         if existing_user:
             return jsonify({'error': 'Email already registered'}), 409
         
-        # Hash password
-        password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        # FIXED: Use centralized password service
+        password_hash = password_service.hash_password(password)
         
         # Generate TOTP secret for 2FA
         totp_secret = pyotp.random_base32()
@@ -191,8 +177,8 @@ def register():
         db.session.add(new_user)
         db.session.flush()  # Get user ID
         
-        # Generate and send OTP for email verification
-        otp_code = generate_otp()
+        # FIXED: Use centralized security service
+        otp_code = security_service.generate_otp()
         otp = OTPCode(
             user_id=new_user.id,
             code=otp_code,
@@ -281,8 +267,8 @@ def resend_otp():
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
-        # Generate new OTP
-        otp_code = generate_otp()
+        # FIXED: Use centralized security service
+        otp_code = security_service.generate_otp()
         otp = OTPCode(
             user_id=user.id,
             code=otp_code,
@@ -305,6 +291,7 @@ def resend_otp():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute; 50 per hour")
 def login():
     """Login with email and password using database."""
     try:
@@ -325,35 +312,13 @@ def login():
         if not user.is_active:
             return jsonify({'error': 'Account is deactivated. Please contact support.'}), 403
         
-        # FIXED: Remove auto-verification bypass for production
-        # Check if email is verified
+        # Check if email is verified — no bypass in any environment
         if not user.is_verified:
-            # Only auto-verify in development mode
-            if os.environ.get('FLASK_ENV') != 'production':
-                user.is_verified = True
-                db.session.commit()
-            else:
-                return jsonify({'error': 'Email not verified. Please check your email for verification code.'}), 403
+            return jsonify({'error': 'Email not verified. Please check your email for verification code.'}), 403
         
-        # Verify password using bcrypt directly (not Flask-Bcrypt wrapper)
-        import bcrypt as raw_bcrypt
-        import logging
-        logger = logging.getLogger(__name__)
-        
+        # FIXED: Use centralized password service (simplified)
         logger.info(f"Login attempt for: {email}")
-        logger.info(f"Password hash: {user.password_hash[:20]}...")
-        
-        try:
-            password_valid = raw_bcrypt.checkpw(
-                password.encode('utf-8'),
-                user.password_hash.encode('utf-8')
-            )
-            logger.info(f"raw_bcrypt result: {password_valid}")
-        except Exception as e:
-            logger.error(f"raw_bcrypt error: {e}")
-            # Fallback to Flask-Bcrypt if raw bcrypt fails
-            password_valid = bcrypt.check_password_hash(user.password_hash, password)
-            logger.info(f"Flask-Bcrypt result: {password_valid}")
+        password_valid = password_service.verify_password(password, user.password_hash)
         
         if not password_valid:
             logger.warning(f"Password validation FAILED for {email}")
@@ -377,8 +342,8 @@ def login():
         access_token = create_access_token(email)
         refresh_token = create_refresh_token(email)
         
-        # Create session in database
-        session_id = secrets.token_urlsafe(32)
+        # FIXED: Use centralized security service
+        session_id = security_service.generate_secure_token(32)
         new_session = DBSession(
             session_id=session_id,
             user_id=user.id,
@@ -397,15 +362,26 @@ def login():
             'message': 'Login successful',
             'token': access_token,
             'refresh_token': refresh_token,
-            'user': {
-                'email': email,
-                'totp_enabled': user.totp_enabled
+            'data': {
+                'user': {
+                    'id': str(user.id),
+                    'email': email,
+                    'username': email.split('@')[0],
+                    'verified': user.is_verified,
+                    'createdAt': user.created_at.isoformat() if user.created_at else None,
+                    'lastLogin': user.last_login.isoformat() if user.last_login else None
+                },
+                'tokens': {
+                    'accessToken': access_token,
+                    'refreshToken': refresh_token
+                }
             }
         }), 200)
         
         # Set httpOnly cookies (more secure than localStorage)
-        response.set_cookie('refresh_token', refresh_token, 
-                          httponly=True, secure=False, samesite='Lax',
+        is_production = os.environ.get('FLASK_ENV') == 'production'
+        response.set_cookie('refresh_token', refresh_token,
+                          httponly=True, secure=is_production, samesite='Lax',
                           max_age=int(REFRESH_TOKEN_EXPIRY.total_seconds()))
         
         return response

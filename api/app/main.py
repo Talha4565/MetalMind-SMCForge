@@ -8,6 +8,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_compress import Compress  # FIXED: Add compression
+from flask_socketio import SocketIO, emit
 import pickle
 import pandas as pd
 import json  # FIXED: Removed duplicate import
@@ -15,7 +16,7 @@ from pathlib import Path
 import logging
 import sys
 from functools import lru_cache
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
 
 # Add parent directory to path for imports
@@ -29,18 +30,54 @@ from api.app.database import init_database
 from api.app.auth import init_auth, token_required
 from api.app.watchlist import watchlist_bp
 from api.app.profile import profile_bp
+from api.app.middleware.error_handler import register_error_handlers
+from api.app.etl_routes import etl_bp
+from api.app.etl_dashboard import dashboard_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Initialize SocketIO for real-time features
+socketio = SocketIO(app, cors_allowed_origins=["http://localhost:3000"])
+
+# FIXED: Register centralized error handlers
+register_error_handlers(app)
+
+
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to every response."""
+    # Content Security Policy — restrict resource loading to known safe origins
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    # Prevent MIME-type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Force HTTPS in production
+    if app.config.get('ENV') == 'production':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # Limit referrer info sent to third parties
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Disable browser features not needed by the app
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
+
 # FIXED: Configure CORS properly - allow specific origins
-CORS(app, 
+# Next.js frontend served from port 3000
+CORS(app,
      resources={r"/api/*": {
          "origins": [
-             "http://localhost:3000",  # React dev server
-             "http://localhost:5173",  # Vite dev server
+             "http://localhost:3000",  # Next.js dev server
              "https://yourdomain.com"  # Production (change this)
          ],
          "supports_credentials": True,
@@ -61,6 +98,9 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+# Limit request body size — 2MB max (prevents DoS via large payloads)
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
 # Initialize database FIRST (auth depends on it)
 init_database(app)
 
@@ -70,6 +110,8 @@ init_auth(app)
 # Register additional blueprints
 app.register_blueprint(watchlist_bp)
 app.register_blueprint(profile_bp)
+app.register_blueprint(etl_bp)
+app.register_blueprint(dashboard_bp)
 
 
 # FIXED: Encapsulate all global state in proper classes for thread safety and testability
@@ -186,7 +228,7 @@ class FileCache:
         self._lock = threading.Lock()
         self._ttl = ttl_seconds
     
-    def get_json(self, filepath: FilePath):
+    def get_json(self, filepath: Path):
         """Get cached JSON file content if still valid."""
         with self._lock:
             if not filepath.exists():
@@ -228,44 +270,50 @@ class BacktestManager:
     
     def is_running(self) -> bool:
         """Check if backtest is currently running."""
-        return self._lock.locked()
-    
+        with self._lock:
+            return self._status['running']
+
     def get_status(self) -> dict:
         """Get current backtest status."""
-        return self._status.copy()
-    
+        with self._lock:
+            return self._status.copy()
+
     def run(self, start_date: str, end_date: str) -> dict:
         """Run backtest with lock. Returns result dict."""
-        if self._lock.locked():
-            return {'error': 'Backtest already running', 'status': self._status}, 409
-        
         with self._lock:
+            if self._status['running']:
+                return {'error': 'Backtest already running', 'status': self._status}, 409
             self._status = {'running': True, 'progress': 0, 'error': None}
-            
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ['python', 'run.py', '--mode', 'backtest'], 
-                    capture_output=True, 
-                    text=True, 
-                    cwd=Path.cwd(),
-                    timeout=300
-                )
-                
-                if result.returncode == 0:
+
+        try:
+            import subprocess, sys
+            project_root = Path(__file__).parent.parent.parent
+            result = subprocess.run(
+                [sys.executable, 'run.py', '--mode', 'backtest'],
+                capture_output=True,
+                text=True,
+                cwd=str(project_root),
+                timeout=300
+            )
+
+            if result.returncode == 0:
+                with self._lock:
                     self._status = {'running': False, 'progress': 100, 'error': None}
-                    return {'status': 'completed', 'message': 'Backtest completed successfully'}, 200
-                else:
-                    error_msg = result.stderr or 'Unknown error'
+                return {'status': 'completed', 'message': 'Backtest completed successfully'}, 200
+            else:
+                error_msg = result.stderr or 'Unknown error'
+                with self._lock:
                     self._status = {'running': False, 'progress': 0, 'error': error_msg}
-                    return {'error': f'Backtest failed: {error_msg}'}, 500
-                    
-            except subprocess.TimeoutExpired:
+                return {'error': f'Backtest failed: {error_msg}'}, 500
+
+        except subprocess.TimeoutExpired:
+            with self._lock:
                 self._status = {'running': False, 'progress': 0, 'error': 'Timeout'}
-                return {'error': 'Backtest timed out after 5 minutes'}, 500
-            except Exception as e:
+            return {'error': 'Backtest timed out after 5 minutes'}, 500
+        except Exception as e:
+            with self._lock:
                 self._status = {'running': False, 'progress': 0, 'error': str(e)}
-                return {'error': f'Backtest error: {str(e)}'}, 500
+            return {'error': f'Backtest error: {str(e)}'}, 500
 
 
 # FIXED: Initialize managers (no global dicts!)
@@ -287,7 +335,8 @@ def health_check():
         db_healthy = False
         try:
             from api.app.database import db
-            db.session.execute('SELECT 1')
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1'))
             db_healthy = True
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
@@ -295,15 +344,16 @@ def health_check():
         # Get model status
         models_status = model_manager.get_loaded_models()
         
-        # Check file system access
-        fs_healthy = Path('reports').exists() and Path('models').exists()
+        # Check file system access (use absolute paths from project root)
+        project_root = Path(__file__).parent.parent.parent
+        fs_healthy = (project_root / 'reports').exists() and (project_root / 'models').exists()
         
-        # Overall health
-        overall_healthy = db_healthy and fs_healthy
+        # Overall health - filesystem is not critical, just log warning
+        overall_healthy = db_healthy  # Only DB is critical for health
         
         return jsonify({
             'status': 'healthy' if overall_healthy else 'degraded',
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'checks': {
                 'database': 'ok' if db_healthy else 'error',
                 'filesystem': 'ok' if fs_healthy else 'error',
@@ -434,9 +484,10 @@ def get_backtest_results(current_user_email):
             'silver': 'latest.json',
             'latest': 'latest.json'
         }
-        
-        # Construct path safely
-        results_file = Path('reports/backtest_results') / asset_file_map[asset]
+
+        # Construct absolute path safely (works both locally and in Docker)
+        project_root = Path(__file__).parent.parent.parent
+        results_file = project_root / 'reports' / 'backtest_results' / asset_file_map[asset]
         
         if not results_file.exists():
             return jsonify({'error': f'No backtest results found for {asset}. Run backtest first.'}), 404
@@ -481,8 +532,9 @@ def run_backtest(current_user_email):
 def get_shap_feature_importance(current_user_email):
     """Get SHAP feature importance data."""
     try:
-        # Load SHAP values if they exist
-        shap_file = Path('reports/shap_plots/shap_values.json')
+        # Load SHAP values if they exist (absolute path — works in Docker)
+        project_root = Path(__file__).parent.parent.parent
+        shap_file = project_root / 'reports' / 'shap_plots' / 'shap_values.json'
         
         if shap_file.exists():
             with open(shap_file, 'r') as f:
@@ -515,7 +567,8 @@ def get_shap_feature_importance(current_user_email):
 def get_shap_plot(current_user_email):
     """Serve SHAP feature importance plot."""
     try:
-        plot_file = Path('reports/shap_plots/feature_importance.png')
+        project_root = Path(__file__).parent.parent.parent
+        plot_file = project_root / 'reports' / 'shap_plots' / 'feature_importance.png'
         
         if plot_file.exists():
             return send_file(plot_file, mimetype='image/png')
@@ -536,7 +589,8 @@ def manage_config(current_user_email):
     GET: Returns current configuration
     POST: Updates configuration (body: JSON config object)
     """
-    config_file = Path('config/user_config.json')
+    project_root = Path(__file__).parent.parent.parent
+    config_file = project_root / 'config' / 'user_config.json'
     
     if request.method == 'GET':
         try:
@@ -670,5 +724,32 @@ def get_model_info(current_user_email):
         return jsonify({'error': str(e)}), 500
 
 
+# REMOVED: Flask UI serving routes - now using Next.js frontend
+# All UI routes removed to make Flask API-only
+
+# WebSocket event handlers for real-time features
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    logger.info('Client connected')
+    emit('connected', {'status': 'success'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection."""
+    logger.info('Client disconnected')
+
+@socketio.on('subscribe_predictions')
+def handle_subscribe_predictions(data):
+    """Subscribe to real-time prediction updates."""
+    logger.info(f'Client subscribed to predictions: {data}')
+    emit('subscription_confirmed', {'type': 'predictions'})
+
+@socketio.on('subscribe_etl_status')
+def handle_subscribe_etl_status(data):
+    """Subscribe to ETL pipeline status updates."""
+    logger.info(f'Client subscribed to ETL status: {data}')
+    emit('subscription_confirmed', {'type': 'etl_status'})
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
