@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 # Resend API configuration
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 'demo-mode')
-FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@metalmind-smc.com')
+FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', os.environ.get('FROM_EMAIL', 'noreply@metalmind-smc.com'))
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5000')
 
 # Check if Resend is available
 try:
@@ -59,10 +60,17 @@ class EmailService:
         
         return self._send_email(to_email, subject, html_content, text_content)
     
+    def send_email_verification(self, to_email: str, otp_code: str) -> bool:
+        """Send email verification OTP after an email address change."""
+        subject = "MetalMind SMCForge - Verify Your New Email Address"
+        html_content = self._generate_otp_email_html(otp_code)
+        text_content = f"Your MetalMind SMCForge email verification code is: {otp_code}\n\nThis code expires in 10 minutes."
+        return self._send_email(to_email, subject, html_content, text_content)
+
     def send_password_reset(self, to_email: str, reset_token: str) -> bool:
         """Send password reset email."""
         subject = "MetalMind SMCForge - Password Reset"
-        reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+        reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
         html_content = self._generate_reset_email_html(reset_link)
         text_content = f"Reset your password: {reset_link}\n\nThis link expires in 1 hour."
         

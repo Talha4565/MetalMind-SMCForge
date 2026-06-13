@@ -17,22 +17,19 @@ logger = logging.getLogger(__name__)
 watchlist_bp = Blueprint('watchlist', __name__, url_prefix='/api/watchlist')
 
 
-# FIXED: Import centralized token_required from auth module
+# Import centralized token_required from auth module
 from api.app.auth import token_required as auth_token_required
 
 def token_required(f):
     """Wrapper to convert email from auth to User object for watchlist routes."""
     @wraps(f)
-    def decorated(*args, **kwargs):
-        # Use the centralized auth token_required
-        def inner(email, *inner_args, **inner_kwargs):
-            # Convert email to User object
-            current_user = User.query.filter_by(email=email).first()
-            if not current_user:
-                return jsonify({'error': 'User not found'}), 401
-            return f(current_user, *inner_args, **inner_kwargs)
-        
-        return auth_token_required(inner)(*args, **kwargs)
+    @auth_token_required
+    def decorated(email, *args, **kwargs):
+        # Convert email to User object
+        current_user = User.query.filter_by(email=email).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        return f(current_user, *args, **kwargs)
     
     return decorated
 

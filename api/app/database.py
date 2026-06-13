@@ -38,6 +38,7 @@ class User(db.Model):
     sessions = db.relationship('Session', backref='user', lazy=True, cascade='all, delete-orphan')
     watchlist_items = db.relationship('WatchlistItem', backref='user', lazy=True, cascade='all, delete-orphan')
     otp_codes = db.relationship('OTPCode', backref='user', lazy=True, cascade='all, delete-orphan')
+    settings = db.relationship('UserSettings', backref='user', lazy=True, uselist=False, cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<User {self.email}>'
@@ -148,6 +149,38 @@ class WatchlistItem(db.Model):
             'notes': self.notes,
             'order': self.order,
             'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class UserSettings(db.Model):
+    """User preferences/settings persisted in database."""
+    __tablename__ = 'user_settings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+
+    # UI preferences
+    theme = db.Column(db.String(10), default='dark', nullable=False)
+    default_timeframe = db.Column(db.String(10), default='15m', nullable=False)
+    default_asset = db.Column(db.String(20), default='gold', nullable=False)
+
+    # Notification preferences
+    notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    email_notifications = db.Column(db.Boolean, default=True, nullable=False)
+
+    # Timestamps
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f'<UserSettings for user {self.user_id}>'
+
+    def to_dict(self):
+        return {
+            'theme': self.theme,
+            'default_timeframe': self.default_timeframe,
+            'default_asset': self.default_asset,
+            'notifications_enabled': self.notifications_enabled,
+            'email_notifications': self.email_notifications,
         }
 
 

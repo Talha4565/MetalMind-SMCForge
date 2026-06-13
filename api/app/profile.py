@@ -8,37 +8,30 @@ from datetime import datetime
 from functools import wraps
 import logging
 
-from api.app.database import db, User
-import bcrypt
+from api.app.database import db, User, UserSettings
+from api.app.services.password_service import password_service
+from api.app.services.validation_service import validation_service
+from api.app.services.email_service import email_service
+from api.app.auth import token_required as auth_token_required
+import re
 
 logger = logging.getLogger(__name__)
-
-
-def hash_password(password: str) -> str:
-    """Hash password using bcrypt."""
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 # Create blueprint
 profile_bp = Blueprint('profile', __name__, url_prefix='/api/profile')
 
 
-# FIXED: Import centralized token_required from auth module
-from api.app.auth import token_required as auth_token_required
-
+# Import centralized token_required from auth module
 def token_required(f):
     """Wrapper to convert email from auth to User object for profile routes."""
     @wraps(f)
-    def decorated(*args, **kwargs):
-        # Use the centralized auth token_required
-        def inner(email, *inner_args, **inner_kwargs):
-            # Convert email to User object
-            current_user = User.query.filter_by(email=email).first()
-            if not current_user:
-                return jsonify({'error': 'User not found'}), 401
-            return f(current_user, *inner_args, **inner_kwargs)
-        
-        return auth_token_required(inner)(*args, **kwargs)
+    @auth_token_required
+    def decorated(email, *args, **kwargs):
+        # Convert email to User object
+        current_user = User.query.filter_by(email=email).first()
+        if not current_user:
+            return jsonify({'error': 'User not found'}), 401
+        return f(current_user, *args, **kwargs)
     
     return decorated
 
@@ -91,10 +84,20 @@ def update_profile(current_user):
             if existing:
                 return jsonify({'error': 'Email already in use'}), 409
             
-            # Update email and mark as unverified
+            # Update email and mark as unverified, then send verification OTP
             current_user.email = new_email
             current_user.is_verified = False
-            # TODO: Send verification email
+            from api.app.database import OTPCode
+            from api.app.services.security_service import security_service
+            from datetime import timedelta
+            otp_code = security_service.generate_otp()
+            otp = OTPCode(
+                user_id=current_user.id,
+                code=otp_code,
+                expires_at=datetime.utcnow() + timedelta(minutes=10)
+            )
+            db.session.add(otp)
+            email_service.send_otp(new_email, otp_code)
     
     current_user.updated_at = datetime.utcnow()
     
@@ -135,26 +138,17 @@ def change_password(current_user):
     current_password = data['current_password']
     new_password = data['new_password']
     
-    # Verify current password
-    import bcrypt
-    if not bcrypt.checkpw(current_password.encode('utf-8'), current_user.password_hash.encode('utf-8')):
+    # FIXED: Use centralized password service
+    if not password_service.verify_password(current_password, current_user.password_hash):
         return jsonify({'error': 'Current password is incorrect'}), 401
     
     # Validate new password strength
-    if len(new_password) < 8:
-        return jsonify({'error': 'Password must be at least 8 characters'}), 400
-    
-    if not re.search(r'[A-Z]', new_password):
-        return jsonify({'error': 'Password must contain at least one uppercase letter'}), 400
-    
-    if not re.search(r'[a-z]', new_password):
-        return jsonify({'error': 'Password must contain at least one lowercase letter'}), 400
-    
-    if not re.search(r'[0-9]', new_password):
-        return jsonify({'error': 'Password must contain at least one number'}), 400
+    is_valid, error_msg = password_service.validate_strength(new_password)
+    if not is_valid:
+        return jsonify({'error': error_msg}), 400
     
     # Update password
-    current_user.password_hash = hash_password(new_password)
+    current_user.password_hash = password_service.hash_password(new_password)
     current_user.updated_at = datetime.utcnow()
     
     # FIXED: Add transaction rollback on error
@@ -175,21 +169,18 @@ def change_password(current_user):
 def get_settings(current_user):
     """
     Get user settings/preferences.
-    
+
     Returns:
         200: User settings
     """
-    # For now, return basic settings
-    # In future, add UserSettings model for more complex preferences
-    settings = {
-        'theme': 'dark',  # Default theme
-        'notifications_enabled': True,
-        'email_notifications': True,
-        'default_timeframe': '15m',
-        'default_asset': 'gold'
-    }
-    
-    return jsonify({'settings': settings}), 200
+    # Get or create settings row for this user
+    settings = UserSettings.query.filter_by(user_id=current_user.id).first()
+    if not settings:
+        settings = UserSettings(user_id=current_user.id)
+        db.session.add(settings)
+        db.session.commit()
+
+    return jsonify({'settings': settings.to_dict()}), 200
 
 
 @profile_bp.route('/settings', methods=['PUT'])
@@ -231,13 +222,34 @@ def update_settings(current_user):
         if data['default_asset'] not in valid_assets:
             return jsonify({'error': f'Invalid asset. Valid options: {", ".join(valid_assets)}'}), 400
     
-    # TODO: Store settings in database (add UserSettings model)
-    # For now, just return success
-    
-    return jsonify({
-        'message': 'Settings updated successfully',
-        'settings': data
-    }), 200
+    # Get or create settings row for this user
+    settings = UserSettings.query.filter_by(user_id=current_user.id).first()
+    if not settings:
+        settings = UserSettings(user_id=current_user.id)
+        db.session.add(settings)
+
+    # Apply validated updates
+    if 'theme' in data:
+        settings.theme = data['theme']
+    if 'notifications_enabled' in data:
+        settings.notifications_enabled = bool(data['notifications_enabled'])
+    if 'email_notifications' in data:
+        settings.email_notifications = bool(data['email_notifications'])
+    if 'default_timeframe' in data:
+        settings.default_timeframe = data['default_timeframe']
+    if 'default_asset' in data:
+        settings.default_asset = data['default_asset']
+
+    try:
+        db.session.commit()
+        return jsonify({
+            'message': 'Settings updated successfully',
+            'settings': settings.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to update settings: {e}")
+        return jsonify({'error': 'Failed to update settings'}), 500
 
 
 @profile_bp.route('/delete', methods=['DELETE'])
@@ -258,9 +270,8 @@ def delete_account(current_user):
     if not data or 'password' not in data:
         return jsonify({'error': 'Password confirmation is required'}), 400
     
-    # Verify password
-    import bcrypt
-    if not bcrypt.checkpw(data['password'].encode('utf-8'), current_user.password_hash.encode('utf-8')):
+    # FIXED: Use centralized password service
+    if not password_service.verify_password(data['password'], current_user.password_hash):
         return jsonify({'error': 'Incorrect password'}), 401
     
     # Soft delete - mark as inactive
