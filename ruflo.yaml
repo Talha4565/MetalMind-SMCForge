@@ -1,0 +1,151 @@
+name: MetalMind SMCForge
+version: 1.0.0
+description: AI-powered trading signals platform with Ruflo multi-agent orchestration
+
+# Ruflo Configuration
+ruflo:
+  version: '3.7'
+  
+  # Core MCP server settings
+  mcp:
+    port: 3001
+    host: localhost
+    timeout_ms: 30000
+    max_connections: 100
+    
+  # Agent swarm configuration
+  swarm:
+    topology: hierarchical  # or 'mesh', 'adaptive'
+    consensus: leader       # or 'voting', 'federated'
+    replication: 2
+    heartbeat_ms: 5000
+    
+  # Memory and learning
+  memory:
+    backend: agentdb        # Vector DB for agent memory
+    retention_policy: rolling
+    indices:
+      - namespace: "signals:analysis"
+        ttl_days: 7
+        embeddings: 1536
+      - namespace: "backtest:results"
+        ttl_days: 30
+        embeddings: 1536
+      - namespace: "risk:monitoring"
+        ttl_days: 90
+        embeddings: 1536
+      - namespace: "performance:metrics"
+        ttl_days: 365
+        embeddings: 1536
+      - namespace: "data:curation"
+        ttl_days: 14
+        embeddings: 1536
+    
+  # Learning configuration
+  learning:
+    enabled: true
+    algorithm: sona         # Self-Optimized Neural Adaptation
+    neural_patterns: true
+    trajectory_storage: true
+    min_success_rate: 0.75
+    
+  # Budget limits per agent
+  budgets:
+    signal-analyzer:
+      tokens_per_day: 50000
+      cost_usd_per_day: 2.5
+    backtest-executor:
+      tokens_per_day: 100000
+      cost_usd_per_day: 5.0
+    risk-monitor:
+      tokens_per_day: 25000
+      cost_usd_per_day: 1.0
+    performance-tracker:
+      tokens_per_day: 75000
+      cost_usd_per_day: 3.0
+    data-curator:
+      tokens_per_day: 30000
+      cost_usd_per_day: 1.2
+  
+  # Security
+  security:
+    verify_signatures: true
+    input_validation: strict
+    pii_removal: aggressive
+    audit_trail: enabled
+    federation_tls: true
+    
+  # Hooks for auto-learning
+  hooks:
+    post_task: true
+    post_error: true
+    periodic_optimization: true
+    optimization_interval_hours: 6
+    
+  # Background workers
+  workers:
+    enabled: true
+    auto_trigger: true
+    workers:
+      - name: audit_checker
+        interval_hours: 1
+      - name: optimize_memory
+        interval_hours: 6
+      - name: test_gaps
+        interval_hours: 12
+      - name: cost_optimizer
+        interval_hours: 24
+  
+  # Federation (for distributed agents)
+  federation:
+    enabled: false
+    network: trading-agents
+    mesh: true
+    wireguard: true
+    peer_discovery: true
+    
+  # Web UI
+  web_ui:
+    enabled: true
+    port: 3001
+    host: 0.0.0.0
+    authentication: optional
+    
+  # Goal planner
+  goal_planner:
+    enabled: true
+    port: 3002
+    planner_algorithm: astar
+    max_planning_depth: 10
+    replanning_enabled: true
+
+# Agent definitions reference
+agents:
+  signal-analyzer:
+    enabled: true
+    tier: primary
+  backtest-executor:
+    enabled: true
+    tier: primary
+  risk-monitor:
+    enabled: true
+    tier: primary
+  performance-tracker:
+    enabled: true
+    tier: secondary
+  data-curator:
+    enabled: true
+    tier: secondary
+
+# Integrations
+integrations:
+  flask_api:
+    url: http://localhost:5000
+    timeout_ms: 30000
+    auth: bearer
+  trading_data:
+    provider: internal
+    update_interval_ms: 5000
+  memory_db:
+    url: http://localhost:6379
+    db: 0

@@ -1,0 +1,29 @@
+---
+name: signal-analyzer
+role: Trading Signal Analyst
+description: Analyzes real-time trading signals and predicts market movements using SMC concepts
+tier: primary
+model: claude-opus
+capabilities:
+  - signal_analysis
+  - pattern_recognition
+  - market_prediction
+  - anomaly_detection
+tools:
+  - api_client
+  - memory_store
+  - data_analyzer
+memory:
+  namespace: "signals:analysis"
+  retention: "7d"
+  shared_with:
+    - backtest-executor
+    - risk-monitor
+config:
+  max_concurrent_tasks: 3
+  timeout_ms: 30000
+  retry_policy: "exponential"
+  priority: "high"
+  budget:
+    tokens: 50000
+    cost_limit_usd: 2.5

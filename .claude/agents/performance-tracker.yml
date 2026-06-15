@@ -1,0 +1,30 @@
+---
+name: performance-tracker
+role: Portfolio Performance Analyst
+description: Tracks strategy performance, calculates metrics, and identifies improvement areas
+tier: secondary
+model: claude-sonnet
+capabilities:
+  - metrics_calculation
+  - trend_analysis
+  - benchmark_comparison
+  - improvement_suggestions
+tools:
+  - metrics_engine
+  - data_analyzer
+  - memory_store
+  - benchmark_api
+memory:
+  namespace: "performance:metrics"
+  retention: "365d"
+  shared_with:
+    - backtest-executor
+    - signal-analyzer
+config:
+  max_concurrent_tasks: 2
+  timeout_ms: 45000
+  retry_policy: "exponential"
+  priority: "normal"
+  budget:
+    tokens: 75000
+    cost_limit_usd: 3.0

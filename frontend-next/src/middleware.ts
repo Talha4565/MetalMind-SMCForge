@@ -13,6 +13,5 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/backtest/:path*',
-    '/profile/:path*',
   ],
 };

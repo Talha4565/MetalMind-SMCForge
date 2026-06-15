@@ -11,7 +11,8 @@ from config.settings import get_label_params
 def generate_labels(df: pd.DataFrame, 
                     take_profit_pct: float = None,
                     stop_loss_pct: float = None,
-                    max_bars: int = None) -> pd.Series:
+                    max_bars: int = None,
+                    asset: str = "gold") -> pd.Series:
     """
     Generate trading labels using triple-barrier method.
     
@@ -21,14 +22,15 @@ def generate_labels(df: pd.DataFrame,
     
     Args:
         df: DataFrame with 'close' column
-        take_profit_pct: Take profit threshold (default from config: 0.45%)
-        stop_loss_pct: Stop loss threshold (default from config: 0.15%)
+        take_profit_pct: Take profit threshold (default from asset-specific config)
+        stop_loss_pct: Stop loss threshold (default from asset-specific config)
         max_bars: Maximum bars to look ahead (default from config: 6)
+        asset: Asset name ("gold" or "silver") for asset-specific thresholds
     
     Returns:
         Series of binary labels (1 = trade signal, 0 = no trade)
     """
-    params = get_label_params()
+    params = get_label_params(asset)
     
     tp = take_profit_pct or params['take_profit_pct']
     sl = stop_loss_pct or params['stop_loss_pct']

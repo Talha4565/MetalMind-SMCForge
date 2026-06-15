@@ -35,7 +35,7 @@ class MultiTimeframeLoader:
         
         # Handle separate Date/Time columns
         if 'Date' in df.columns and 'Time' in df.columns:
-            df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'])
+            df['DateTime'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='mixed')
             df.drop(columns=['Date', 'Time'], inplace=True)
         elif 'Date' in df.columns:
             df['DateTime'] = pd.to_datetime(df['Date'])

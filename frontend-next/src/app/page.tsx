@@ -1,10 +1,10 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { ArrowRight, Zap } from 'lucide-react';
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center bg-[#0a0f1a] text-white p-6 overflow-hidden">
-      {/* Grid pattern — trading terminal feel */}
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-6 overflow-hidden">
+      {/* Grid pattern â€” trading terminal feel */}
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -19,7 +19,7 @@ export default function Home() {
 
       <div className="relative z-10 flex flex-col items-center text-center space-y-10 max-w-4xl">
         {/* Eyebrow */}
-        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-slate-700/50 bg-slate-800/30">
+        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border/50 bg-slate-800/30">
           <Zap className="w-3.5 h-3.5 text-emerald-400" />
           <span className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
             AI-powered smart money concepts
@@ -52,17 +52,17 @@ export default function Home() {
           </Link>
           <Link
             href="https://github.com/Talha/ml-signals"
-            className="px-8 py-4 bg-transparent hover:bg-slate-800/50 border border-slate-700 text-slate-300 font-bold rounded-xl transition-all flex items-center justify-center"
+            className="px-8 py-4 bg-transparent hover:bg-accent/50 border border-border text-muted-foreground font-bold rounded-xl transition-all flex items-center justify-center"
           >
             View source
           </Link>
         </div>
 
         {/* Live ticker strip */}
-        <div className="w-full max-w-2xl pt-8 border-t border-slate-800/50">
+        <div className="w-full max-w-2xl pt-8 border-t border-border/50">
           <div className="grid grid-cols-3 gap-8 text-center">
             <div>
-              <span className="text-3xl md:text-4xl font-black font-mono text-slate-100">
+              <span className="text-3xl md:text-4xl font-black font-mono text-card-foreground">
                 XAU
               </span>
               <p className="text-[10px] uppercase tracking-widest text-emerald-500 mt-1">
@@ -70,7 +70,7 @@ export default function Home() {
               </p>
             </div>
             <div>
-              <span className="text-3xl md:text-4xl font-black font-mono text-slate-100">
+              <span className="text-3xl md:text-4xl font-black font-mono text-card-foreground">
                 XAG
               </span>
               <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">

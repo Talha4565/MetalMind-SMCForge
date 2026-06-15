@@ -18,7 +18,7 @@ interface DashboardLayoutProps {
  */
 export default function DashboardLayout({ children, className }: DashboardLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-[#0a0f1a]">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0">
         <Header />

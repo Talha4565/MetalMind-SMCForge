@@ -88,6 +88,30 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  etl:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: metalmind-etl
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./:/app
+      - /app/__pycache__
+    entrypoint: []
+    command: >
+      sh -c "
+        cd /app && \
+        python run_pipeline.py --mode schedule
+      "
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   instance_data:
   db_data:

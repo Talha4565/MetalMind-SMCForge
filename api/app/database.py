@@ -3,8 +3,14 @@ Database setup with SQLAlchemy
 Uses SQLite for demo, easily switchable to PostgreSQL for production
 """
 
+import os
+import time
+import logging
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import OperationalError
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
 
@@ -167,6 +173,8 @@ class UserSettings(db.Model):
     # Notification preferences
     notifications_enabled = db.Column(db.Boolean, default=True, nullable=False)
     email_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    # Avatar
+    avatar_url = db.Column(db.String(512), nullable=True)
 
     # Timestamps
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -181,6 +189,7 @@ class UserSettings(db.Model):
             'default_asset': self.default_asset,
             'notifications_enabled': self.notifications_enabled,
             'email_notifications': self.email_notifications,
+            'avatar_url': self.avatar_url,
         }
 
 
@@ -206,11 +215,16 @@ def init_database(app):
     Args:
         app: Flask application instance
     """
-    # SQLite for demo/development, easily switch to PostgreSQL for production
-    app.config['SQLALCHEMY_DATABASE_URI'] = app.config.get(
-        'SQLALCHEMY_DATABASE_URI',
-        'sqlite:///metalmind_smc.db'
-    )
+    # Use DATABASE_URL from environment when available.
+    # For production, DATABASE_URL must be set to PostgreSQL.
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI') or os.environ.get('DATABASE_URL')
+    if not db_uri:
+        if os.environ.get('FLASK_ENV') == 'production':
+            raise RuntimeError('DATABASE_URL must be set in production')
+        db_uri = 'sqlite:///metalmind_smc.db'
+        logger.warning('Using SQLite fallback database. Set DATABASE_URL for production.')
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     # FIXED: Proper connection pooling configuration for production
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -225,7 +239,27 @@ def init_database(app):
     db.init_app(app)
     
     with app.app_context():
-        # Create all tables
-        db.create_all()
-        print("✅ Database initialized successfully")
-        print(f"📦 Database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+        # In development or SQLite fallback, create missing tables automatically.
+        # In production with PostgreSQL, rely on migrations instead.
+        if db_uri.startswith('sqlite://') or app.config.get('ENV') != 'production':
+            # Only run `create_all()` in explicit development mode to avoid
+            # running DDL from multiple Gunicorn workers (race conditions).
+            if os.environ.get("FLASK_ENV") == "development":
+                attempts = 10
+                delay = 3
+                for attempt in range(1, attempts + 1):
+                    try:
+                        db.create_all()
+                        print("✅ Database initialized successfully")
+                        print(f"📦 Database: {app.config['SQLALCHEMY_DATABASE_URI']}")
+                        break
+                    except OperationalError as exc:
+                        if attempt == attempts:
+                            logger.error('Database initialization failed after %s attempts', attempts)
+                            raise
+                        logger.warning('Database unavailable, retrying in %s seconds (%s/%s)', delay, attempt, attempts)
+                        time.sleep(delay)
+            else:
+                print("Skipping automatic db.create_all() because FLASK_ENV is not 'development'. Use migrations for schema changes.")
+        else:
+            print("✅ Database engine initialized. Use Flask-Migrate to manage production schema.")

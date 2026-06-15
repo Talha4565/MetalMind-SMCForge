@@ -4,7 +4,13 @@ Allows users to view and update their profile information.
 """
 
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
+import pyotp
+import qrcode
+import io
+import base64
+import os
+from werkzeug.utils import secure_filename
 from functools import wraps
 import logging
 
@@ -252,6 +258,99 @@ def update_settings(current_user):
         return jsonify({'error': 'Failed to update settings'}), 500
 
 
+# ------------------- 2FA Endpoints -------------------
+
+
+@profile_bp.route('/2fa/setup', methods=['GET'])
+@token_required
+def get_2fa_setup(current_user):
+    """Return provisioning URI and QR code image for TOTP setup."""
+    try:
+        # Ensure user has a secret
+        if not current_user.totp_secret:
+            secret = pyotp.random_base32()
+            current_user.totp_secret = secret
+            db.session.add(current_user)
+            db.session.commit()
+        else:
+            secret = current_user.totp_secret
+
+        totp = pyotp.TOTP(secret)
+        provisioning_uri = totp.provisioning_uri(name=current_user.email, issuer_name='MetalMind SMCForge')
+
+        # Generate QR PNG data URI
+        img = qrcode.make(provisioning_uri)
+        buf = io.BytesIO()
+        # Use positional format argument to support both PIL and PyPNG image backends
+        img.save(buf, 'PNG')
+        qr_data = base64.b64encode(buf.getvalue()).decode()
+        qr_data_uri = f"data:image/png;base64,{qr_data}"
+
+        return jsonify({
+            'secret': secret,
+            'provisioning_uri': provisioning_uri,
+            'qr': qr_data_uri
+        }), 200
+    except Exception as e:
+        logger.error(f"Failed to generate 2FA setup: {e}")
+        return jsonify({'error': 'Failed to generate 2FA setup'}), 500
+
+
+@profile_bp.route('/2fa/enable', methods=['POST'])
+@token_required
+def enable_2fa(current_user):
+    """Enable TOTP 2FA after verifying provided OTP code."""
+    data = request.get_json() or {}
+    otp_code = str(data.get('otp', '')).strip()
+    if not otp_code:
+        return jsonify({'error': 'OTP code required'}), 400
+
+    if not current_user.totp_secret:
+        return jsonify({'error': 'TOTP not initialized. Get setup first.'}), 400
+
+    totp = pyotp.TOTP(current_user.totp_secret)
+    if not totp.verify(otp_code, valid_window=1):
+        return jsonify({'error': 'Invalid 2FA code'}), 400
+
+    try:
+        current_user.totp_enabled = True
+        db.session.commit()
+        # Notify user
+        email_service.send_2fa_enabled(current_user.email)
+        return jsonify({'success': True, 'message': '2FA enabled successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to enable 2FA: {e}")
+        return jsonify({'error': 'Failed to enable 2FA'}), 500
+
+
+@profile_bp.route('/2fa/disable', methods=['POST'])
+@token_required
+def disable_2fa(current_user):
+    """Disable TOTP 2FA after verifying provided OTP code."""
+    data = request.get_json() or {}
+    otp_code = str(data.get('otp', '')).strip()
+    if not otp_code:
+        return jsonify({'error': 'OTP code required'}), 400
+
+    if not current_user.totp_secret:
+        return jsonify({'error': 'TOTP not initialized'}), 400
+
+    totp = pyotp.TOTP(current_user.totp_secret)
+    if not totp.verify(otp_code, valid_window=1):
+        return jsonify({'error': 'Invalid 2FA code'}), 400
+
+    try:
+        current_user.totp_enabled = False
+        db.session.commit()
+        return jsonify({'success': True, 'message': '2FA disabled successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to disable 2FA: {e}")
+        return jsonify({'error': 'Failed to disable 2FA'}), 500
+
+
+
 @profile_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_account(current_user):
@@ -289,3 +388,53 @@ def delete_account(current_user):
         db.session.rollback()
         logger.error(f"Failed to delete account: {e}")
         return jsonify({'error': 'Failed to delete account'}), 500
+
+
+@profile_bp.route('/avatar', methods=['PUT'])
+@token_required
+def upload_avatar(current_user):
+    """Upload or replace user avatar image. Accepts multipart/form-data with 'avatar' file."""
+    if 'avatar' not in request.files:
+        return jsonify({'error': 'No file part named avatar provided'}), 400
+
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    # Validate basic file type via filename and content-type
+    allowed_ext = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    filename = secure_filename(file.filename)
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    if ext not in allowed_ext:
+        return jsonify({'error': f'File type not allowed. Allowed: {", ".join(sorted(allowed_ext))}'}), 400
+
+    # Limit file size (e.g., 2MB)
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    max_size = 2 * 1024 * 1024
+    if size > max_size:
+        return jsonify({'error': 'File too large (limit 2MB)'}), 400
+
+    try:
+        avatars_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'avatars')
+        os.makedirs(avatars_dir, exist_ok=True)
+        dest_filename = f'user_{current_user.id}.{ext}'
+        dest_path = os.path.join(avatars_dir, dest_filename)
+        file.save(dest_path)
+
+        # Save public path in user settings
+        settings = current_user.settings
+        if not settings:
+            from api.app.database import UserSettings
+            settings = UserSettings(user_id=current_user.id)
+            db.session.add(settings)
+
+        settings.avatar_url = f'/static/avatars/{dest_filename}'
+        db.session.commit()
+
+        return jsonify({'message': 'Avatar uploaded', 'profile': current_user.to_dict(), 'avatar_url': settings.avatar_url}), 200
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to upload avatar: {e}")
+        return jsonify({'error': 'Failed to upload avatar'}), 500

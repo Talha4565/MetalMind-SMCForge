@@ -30,7 +30,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
 
   if (isLoading) {
     return (
-      <Card className="bg-slate-900 border-slate-800 animate-pulse">
+      <Card className="bg-card border-border animate-pulse">
         <div className="h-48" />
       </Card>
     );
@@ -52,7 +52,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
       : "text-slate-400 bg-slate-400/10 border-slate-400/20";
 
   return (
-    <Card className={cn("bg-slate-900 border-slate-800 overflow-hidden group transition-all hover:border-slate-700", {
+    <Card className={cn("bg-card border-border overflow-hidden group transition-all hover:border-border/80", {
       "border-l-4 border-l-green-500": isBuy,
       "border-l-4 border-l-red-500": isSell,
     })}>
@@ -63,7 +63,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-lg uppercase tracking-wider text-slate-200">
+              <h3 className="font-bold text-lg uppercase tracking-wider text-card-foreground">
                 {currentPrediction.asset}
               </h3>
               <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -86,7 +86,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
       <CardContent className="space-y-6">
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-3xl font-black text-slate-100">
+            <p className="text-3xl font-black text-card-foreground">
               ${livePrice !== null && livePrice !== undefined
                 ? livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 : currentPrediction.price.toLocaleString()
@@ -104,7 +104,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-800">
+        <div className="pt-4 border-t border-border">
           <div className="flex items-center gap-2 mb-3">
             <Info className="w-4 h-4 text-blue-400" />
             <span className="text-xs font-semibold text-slate-300 uppercase tracking-widest">Key Drivers (SHAP)</span>
@@ -116,7 +116,7 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
                 <div key={i} className="flex justify-between items-center text-xs">
                   <span className="text-slate-500 truncate mr-2">{shap.feature}</span>
                   <div className="flex items-center gap-2 min-w-[100px]">
-                    <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div 
                         className={cn("h-full rounded-full", shap.contribution > 0 ? "bg-green-500" : "bg-red-500")}
                         style={{ width: `${Math.min(Math.abs(shap.contribution) * 100, 100)}%` }}

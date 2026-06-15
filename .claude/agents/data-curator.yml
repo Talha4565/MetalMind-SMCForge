@@ -1,0 +1,30 @@
+---
+name: data-curator
+role: Data Quality & Feature Engineering Lead
+description: Validates data quality, engineers features, and maintains data pipelines
+tier: secondary
+model: claude-haiku
+capabilities:
+  - data_validation
+  - feature_engineering
+  - data_cleaning
+  - pipeline_monitoring
+tools:
+  - data_validator
+  - feature_extractor
+  - pipeline_monitor
+  - memory_store
+memory:
+  namespace: "data:curation"
+  retention: "14d"
+  shared_with:
+    - signal-analyzer
+    - backtest-executor
+config:
+  max_concurrent_tasks: 4
+  timeout_ms: 60000
+  retry_policy: "exponential"
+  priority: "normal"
+  budget:
+    tokens: 30000
+    cost_limit_usd: 1.2

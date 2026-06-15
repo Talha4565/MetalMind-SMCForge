@@ -406,8 +406,14 @@ prediction_cache = PredictionCache(ttl_seconds=60)
 backtest_manager = BacktestManager()
 file_cache = FileCache(ttl_seconds=60)  # FIXED: Cache for JSON files
 
+# Initialize prediction logger and email alerts
+from etl.prediction_logger import PredictionLogger
+from etl.alerts import EmailAlertService
+prediction_logger = PredictionLogger()
+email_alerts = EmailAlertService(confidence_threshold=0.70)
+
 logger.info("✅ Server ready - models will be loaded on first request (lazy loading)")
-logger.info("✅ ModelManager, PredictionCache, and BacktestManager initialized")
+logger.info("✅ ModelManager, PredictionCache, BacktestManager, PredictionLogger initialized")
 
 
 @app.route('/api/health', methods=['GET'])
@@ -540,6 +546,27 @@ def get_latest_predictions():
             prediction_cache.set(cache_key, df)
         else:
             logger.info(f"Using cached data for {asset}")
+        
+        # Inject current live price into the latest bar
+        try:
+            import requests as req
+            ticker_map = {'gold': 'GC=F', 'silver': 'SI=F'}
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_map[asset]}?interval=1m&range=1d"
+            resp = req.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            resp.raise_for_status()
+            meta = resp.json()["chart"]["result"][0]["meta"]
+            live_price = float(meta["regularMarketPrice"])
+            
+            # Update the latest bar with current price
+            latest_idx = df.index[-1]
+            df.loc[latest_idx, 'close'] = live_price
+            df.loc[latest_idx, 'open'] = live_price
+            df.loc[latest_idx, 'high'] = live_price
+            df.loc[latest_idx, 'low'] = live_price
+            df.loc[latest_idx, 'price'] = live_price
+            logger.info(f"Injected live price ${live_price:.2f} into latest {asset} bar")
+        except Exception as e:
+            logger.warning(f"Could not fetch live price for prediction: {e}")
         
         # Get most recent N bars
         recent_data = df.iloc[-limit:].copy()
@@ -869,8 +896,29 @@ def manage_config(current_user_email):
                 json.dump(new_config, f, indent=2)
             
             logger.info("Configuration updated successfully")
+        
+        # Log the latest prediction and check for alerts
+        if results:
+            latest = results[-1]
+            prediction_logger.log_prediction(
+                asset=asset,
+                signal=latest['signal'],
+                confidence=latest['confidence'],
+                price=latest['price'],
+                shap_values=latest.get('shap_values', [])
+            )
             
-            return jsonify({
+            # Send email alert if confidence > 70% and signal is BUY/SELL
+            if email_alerts.should_alert(latest['signal'], latest['confidence']):
+                email_alerts.send_alert(
+                    asset=asset,
+                    signal=latest['signal'],
+                    confidence=latest['confidence'],
+                    price=latest['price'],
+                    shap_values=latest.get('shap_values', [])
+                )
+        
+        return jsonify({
                 'message': 'Configuration updated successfully',
                 'config': new_config
             })

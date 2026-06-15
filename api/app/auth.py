@@ -4,9 +4,6 @@ Implements: JWT, Email OTP, 2FA, Rate Limiting, Session Management
 """
 
 from flask import Blueprint, request, jsonify, make_response
-from flask_bcrypt import Bcrypt
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 import jwt
 import pyotp
 import qrcode
@@ -17,16 +14,17 @@ from functools import wraps
 import secrets
 import re
 import os
+from flask_limiter.util import get_remote_address
 
 # Import database models and email service
 from api.app.database import db, User, Session as DBSession, OTPCode, WatchlistItem
 from api.app.services.email_service import email_service
+from api.app.extensions import limiter, bcrypt
 import logging
 
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
-bcrypt = Bcrypt()
 
 # FIXED: Use centralized security service for SECRET_KEY validation
 from api.app.services.security_service import security_service
@@ -42,14 +40,6 @@ REFRESH_SECRET_KEY = _refresh_secret
 ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
 REFRESH_TOKEN_EXPIRY = timedelta(days=7)
 OTP_EXPIRY = timedelta(minutes=10)
-
-# Initialize rate limiter with storage backend
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"  # Explicitly set in-memory storage for demo
-)
-
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -167,12 +157,13 @@ def register():
         # Generate TOTP secret for 2FA
         totp_secret = pyotp.random_base32()
         
-        # Create user (unverified)
+        # Create user - auto-verify in development
+        is_dev = os.environ.get('FLASK_ENV') == 'development'
         new_user = User(
             email=email,
             password_hash=password_hash,
             totp_secret=totp_secret,
-            is_verified=False
+            is_verified=is_dev  # Auto-verify in dev, require OTP in prod
         )
         db.session.add(new_user)
         db.session.flush()  # Get user ID
@@ -187,14 +178,16 @@ def register():
         db.session.add(otp)
         db.session.commit()
         
-        # Send OTP email
-        send_otp_email(email, otp_code)
+        # Send OTP email (only in production)
+        if not is_dev:
+            send_otp_email(email, otp_code)
         
         return jsonify({
             'success': True,
-            'message': 'Registration successful. Please verify your email with the OTP sent.',
+            'message': 'Registration successful.' + (' You can log in now.' if is_dev else ' Please verify your email with the OTP sent.'),
             'email': email,
-            'otp_sent': True
+            'otp_sent': not is_dev,
+            'dev_verified': is_dev
         }), 201
     
     except Exception as e:
@@ -391,9 +384,8 @@ def login():
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
 
-# Initialize bcrypt with app (call this from main.py)
+# Initialize extensions correctly from shared instances
 def init_auth(app):
     """Initialize authentication module with Flask app."""
-    bcrypt.init_app(app)
-    limiter.init_app(app)
+    # Bcrypt and Limiter are already initialized in main.py via init_app
     app.register_blueprint(auth_bp, url_prefix='/api/auth')

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import DashboardLayout from '@/components/Common/DashboardLayout';
@@ -107,7 +107,7 @@ export default function ProfilePage() {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-100 flex items-center gap-3">
+          <h1 className="text-3xl font-black tracking-tight text-card-foreground flex items-center gap-3">
             <User className="w-8 h-8 text-blue-500" />
             Account Settings
           </h1>
@@ -116,9 +116,9 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Profile Information */}
-          <Card className="lg:col-span-2 bg-slate-900 border-slate-800">
+          <Card className="lg:col-span-2 bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-lg font-bold text-slate-100">Profile Information</CardTitle>
+              <CardTitle className="text-lg font-bold text-card-foreground">Profile Information</CardTitle>
               <CardDescription>Update your account details</CardDescription>
             </CardHeader>
             <CardContent>
@@ -136,7 +136,7 @@ export default function ProfilePage() {
                           <FormControl>
                             <Input 
                               {...field}
-                              className="bg-slate-950 border-slate-800 text-slate-200 focus:border-blue-500"
+                              className="bg-input/30 border-border text-foreground focus:border-ring"
                             />
                           </FormControl>
                           <FormMessage className="text-xs text-red-500" />
@@ -156,7 +156,7 @@ export default function ProfilePage() {
                             <Input 
                               type="email"
                               {...field}
-                              className="bg-slate-950 border-slate-800 text-slate-200 focus:border-blue-500"
+                              className="bg-input/30 border-border text-foreground focus:border-ring"
                             />
                           </FormControl>
                           <FormMessage className="text-xs text-red-500" />
@@ -188,9 +188,9 @@ export default function ProfilePage() {
           </Card>
 
           {/* Account Status */}
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <CardTitle className="text-lg font-bold text-card-foreground flex items-center gap-2">
                 <Shield className="w-5 h-5 text-green-500" />
                 Account Status
               </CardTitle>
@@ -198,18 +198,18 @@ export default function ProfilePage() {
             <CardContent className="space-y-4">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Status</p>
-                <p className="flex items-center gap-2 text-sm font-bold text-slate-100">
+                <p className="flex items-center gap-2 text-sm font-bold text-card-foreground">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                   Active & Verified
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-800">
+              <div className="pt-4 border-t border-border">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Member Since</p>
                 <p className="text-sm text-slate-300">
                   {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-800">
+              <div className="pt-4 border-t border-border">
                 <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Plan Type</p>
                 <p className="text-sm font-bold text-blue-400">Professional</p>
               </div>
@@ -218,16 +218,16 @@ export default function ProfilePage() {
         </div>
 
         {/* Change Password Section */}
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-bold text-slate-100">Security</CardTitle>
+              <CardTitle className="text-lg font-bold text-card-foreground">Security</CardTitle>
               <CardDescription>Change your password and manage security settings</CardDescription>
             </div>
             {!isEditingPassword && (
               <Button 
                 variant="outline"
-                className="border-slate-800 hover:bg-slate-800"
+                className="border-border hover:bg-accent"
                 onClick={() => setIsEditingPassword(true)}
               >
                 Change Password
@@ -252,7 +252,7 @@ export default function ProfilePage() {
                             <Input 
                               type={showPasswords ? 'text' : 'password'}
                               {...field}
-                              className="bg-slate-950 border-slate-800 text-slate-200 focus:border-blue-500 pr-10"
+                              className="bg-input/30 border-border text-foreground focus:border-ring pr-10"
                             />
                           </FormControl>
                         </div>
@@ -273,7 +273,7 @@ export default function ProfilePage() {
                           <Input 
                             type={showPasswords ? 'text' : 'password'}
                             {...field}
-                            className="bg-slate-950 border-slate-800 text-slate-200 focus:border-blue-500"
+                            className="bg-input/30 border-border text-foreground focus:border-ring"
                           />
                         </FormControl>
                         <FormMessage className="text-xs text-red-500" />
@@ -293,7 +293,7 @@ export default function ProfilePage() {
                           <Input 
                             type={showPasswords ? 'text' : 'password'}
                             {...field}
-                            className="bg-slate-950 border-slate-800 text-slate-200 focus:border-blue-500"
+                            className="bg-input/30 border-border text-foreground focus:border-ring"
                           />
                         </FormControl>
                         <FormMessage className="text-xs text-red-500" />
@@ -305,7 +305,7 @@ export default function ProfilePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="border-slate-800 hover:bg-slate-800"
+                      className="border-border hover:bg-accent"
                       onClick={() => {
                         setShowPasswords(!showPasswords);
                       }}
@@ -345,7 +345,7 @@ export default function ProfilePage() {
                     <Button 
                       type="button"
                       variant="outline"
-                      className="border-slate-800 hover:bg-slate-800"
+                      className="border-border hover:bg-accent"
                       onClick={() => {
                         setIsEditingPassword(false);
                         passwordForm.reset();
