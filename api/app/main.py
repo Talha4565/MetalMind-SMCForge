@@ -547,10 +547,13 @@ def get_latest_predictions():
         else:
             logger.info(f"Using cached data for {asset}")
         
+        # Work on a COPY to avoid corrupting the cached dataframe
+        df = df.copy()
+        
         # Inject current live price into the latest bar
         try:
             import requests as req
-            ticker_map = {'gold': 'GC=F', 'silver': 'SI=F'}
+            ticker_map = {'gold': 'XAUUSD=X', 'silver': 'XAGUSD=X'}
             url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_map[asset]}?interval=1m&range=1d"
             resp = req.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
             resp.raise_for_status()
@@ -665,6 +668,27 @@ def get_latest_predictions():
                 'end': recent_data.index.max().isoformat()
             }
         })
+        
+        # Log the latest prediction and check for alerts
+        if results:
+            latest = results[-1]
+            prediction_logger.log_prediction(
+                asset=asset,
+                signal=latest['signal'],
+                confidence=latest['confidence'],
+                price=latest['price'],
+                shap_values=latest.get('shap_values', [])
+            )
+            
+            # Send email alert if confidence > 70% and signal is BUY/SELL
+            if email_alerts.should_alert(latest['signal'], latest['confidence']):
+                email_alerts.send_alert(
+                    asset=asset,
+                    signal=latest['signal'],
+                    confidence=latest['confidence'],
+                    price=latest['price'],
+                    shap_values=latest.get('shap_values', [])
+                )
     
     except Exception as e:
         logger.error(f"Error getting predictions: {e}")
@@ -896,29 +920,8 @@ def manage_config(current_user_email):
                 json.dump(new_config, f, indent=2)
             
             logger.info("Configuration updated successfully")
-        
-        # Log the latest prediction and check for alerts
-        if results:
-            latest = results[-1]
-            prediction_logger.log_prediction(
-                asset=asset,
-                signal=latest['signal'],
-                confidence=latest['confidence'],
-                price=latest['price'],
-                shap_values=latest.get('shap_values', [])
-            )
             
-            # Send email alert if confidence > 70% and signal is BUY/SELL
-            if email_alerts.should_alert(latest['signal'], latest['confidence']):
-                email_alerts.send_alert(
-                    asset=asset,
-                    signal=latest['signal'],
-                    confidence=latest['confidence'],
-                    price=latest['price'],
-                    shap_values=latest.get('shap_values', [])
-                )
-        
-        return jsonify({
+            return jsonify({
                 'message': 'Configuration updated successfully',
                 'config': new_config
             })
