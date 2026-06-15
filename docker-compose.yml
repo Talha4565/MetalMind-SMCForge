@@ -11,12 +11,26 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
+      - FLASK_ENV=development
+      - FLASK_APP=api/app/main.py
     volumes:
-      - ./instance:/app/instance
-      - ./data:/app/data
-      - ./models:/app/models
-      - ./reports:/app/reports
+      - ./:/app                     # mount full project for hot reload
+      - /app/__pycache__            # prevent cache conflicts
+      - /app/.pytest_cache
+    # Clear the image ENTRYPOINT (the host mount hides the file copied into the image)
+    entrypoint: []
+    # Use sh -c to run migrations then start the socketio-backed server
+    command: >
+      sh -c "
+        cd /app && \
+        flask db upgrade 2>/dev/null || true && \
+        python start_api.py
+      "
+    working_dir: /app
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -32,5 +46,49 @@ services:
       retries: 3
       start_period: 40s
 
+  db:
+    image: postgres:15-alpine
+    container_name: metalmind-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: metalmind
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend-next
+      dockerfile: Dockerfile
+    container_name: metalmind-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - API_URL=http://api:5000
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+    volumes:
+      - ./frontend-next:/app        # hot reload: code changes reflect instantly
+      - /app/node_modules           # prevents conflicts with local node_modules
+      - next_cache:/app/.next       # use named volume for .next cache to avoid permission issues
+    command: npm run dev
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   instance_data:
+  db_data:
+  next_cache:
