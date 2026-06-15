@@ -1,0 +1,31 @@
+---
+name: backtest-executor
+role: Strategy Backtesting Coordinator
+description: Runs strategy backtests, optimizes parameters, and generates performance reports
+tier: primary
+model: claude-sonnet
+capabilities:
+  - backtest_execution
+  - parameter_optimization
+  - performance_analysis
+  - report_generation
+tools:
+  - backtest_api
+  - data_loader
+  - memory_store
+  - report_generator
+memory:
+  namespace: "backtest:results"
+  retention: "30d"
+  shared_with:
+    - signal-analyzer
+    - risk-monitor
+    - performance-tracker
+config:
+  max_concurrent_tasks: 2
+  timeout_ms: 120000
+  retry_policy: "linear"
+  priority: "high"
+  budget:
+    tokens: 100000
+    cost_limit_usd: 5.0

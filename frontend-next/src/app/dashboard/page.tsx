@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 const SHAPExplainer = dynamic(() => import('@/components/Dashboard/SHAPExplainer'), {
   ssr: false,
   loading: () => (
-    <div className="h-[300px] w-full rounded-2xl bg-slate-900 border border-slate-800 animate-pulse flex items-center justify-center">
+    <div className="h-[300px] w-full rounded-2xl bg-card border border-border animate-pulse flex items-center justify-center">
       <p className="text-slate-500 text-sm">Loading Feature Analysis...</p>
     </div>
   ),
@@ -63,7 +63,7 @@ export default function DashboardPage() {
               {activeAsset === 'gold' ? 'XAU / USD' : 'XAG / USD'}
             </p>
             {livePrice !== null && (
-              <h1 className="text-4xl md:text-5xl font-black font-mono text-slate-100 tracking-tight">
+              <h1 className="text-4xl md:text-5xl font-black font-mono text-card-foreground tracking-tight">
                 ${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </h1>
             )}
@@ -76,13 +76,13 @@ export default function DashboardPage() {
             <button
               onClick={() => refetch()}
               className={cn(
-                "p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-all",
+                "p-2.5 rounded-lg bg-card border border-border text-muted-foreground hover:text-foreground transition-all",
                 isRefetching && "animate-spin text-emerald-400"
               )}
             >
               <RefreshCcw className="w-4 h-4" />
             </button>
-            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-800">
+            <div className="flex bg-card p-1 rounded-lg border border-border">
               {(['gold', 'silver'] as AssetType[]).map((asset) => (
                 <button
                   key={asset}
@@ -101,7 +101,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Grid — each card has a distinct visual weight */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Signal"
@@ -110,23 +110,17 @@ export default function DashboardPage() {
           />
           <StatCard
             label="Confidence"
-            value={prediction?.confidence != null ? `${(prediction.confidence * 100).toFixed(0)}%` : '—'}
+            value={prediction?.confidence != null ? `${(prediction.confidence * 100).toFixed(0)}%` : 'â€”'}
             accent="blue"
           />
           <StatCard
-            label="Confidence"
-            value={`${((prediction?.confidence || 0) * 100).toFixed(0)}%`}
-            accent="blue"
-          />
-          <StatCard
-            label="Volatility"
-            value="High"
+            label="Model"
+            value="XGBoost"
             accent="amber"
           />
           <StatCard
-            label="SMC Score"
-            value="84"
-            suffix="/100"
+            label="Features"
+            value="90"
             accent="violet"
           />
         </div>
@@ -153,11 +147,11 @@ export default function DashboardPage() {
               <SHAPExplainer prediction={prediction} />
             )}
 
-            <div className="p-5 rounded-xl bg-slate-900/50 border border-slate-800/50">
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
+            <div className="p-5 rounded-xl bg-card border border-border">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
                 Insight
               </p>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Order flow suggests a liquidity grab below recent lows.
                 Watch for displacement higher before committing to longs.
               </p>
@@ -181,26 +175,26 @@ interface StatCardProps {
 }
 
 const accentMap = {
-  emerald: 'text-emerald-400 border-emerald-500/20',
-  blue: 'text-blue-400 border-blue-500/20',
-  amber: 'text-amber-400 border-amber-500/20',
-  violet: 'text-violet-400 border-violet-500/20',
-  slate: 'text-slate-400 border-slate-700/20',
-  red: 'text-red-400 border-red-500/20',
+  emerald: 'text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+  blue: 'text-blue-600 dark:text-blue-400 border-blue-500/20',
+  amber: 'text-amber-600 dark:text-amber-400 border-amber-500/20',
+  violet: 'text-violet-600 dark:text-violet-400 border-violet-500/20',
+  slate: 'text-muted-foreground border-border',
+  red: 'text-red-600 dark:text-red-400 border-red-500/20',
 };
 
 function StatCard({ label, value, suffix, accent }: StatCardProps) {
   return (
     <div className={cn(
-      "p-4 rounded-xl bg-slate-900/60 border transition-colors",
+      "p-4 rounded-xl bg-card border transition-colors",
       accentMap[accent]
     )}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground mb-2">
         {label}
       </p>
-      <p className="text-2xl font-black font-mono text-slate-100">
+      <p className="text-2xl font-black font-mono text-card-foreground">
         {value}
-        {suffix && <span className="text-sm text-slate-500 font-normal">{suffix}</span>}
+        {suffix && <span className="text-sm text-muted-foreground font-normal">{suffix}</span>}
       </p>
     </div>
   );

@@ -1,0 +1,30 @@
+---
+name: risk-monitor
+role: Risk Management & Compliance Officer
+description: Monitors portfolio risk, enforces position limits, and validates trading decisions
+tier: primary
+model: claude-haiku
+capabilities:
+  - risk_assessment
+  - position_monitoring
+  - alert_generation
+  - compliance_validation
+tools:
+  - risk_calculator
+  - alert_system
+  - memory_store
+  - audit_logger
+memory:
+  namespace: "risk:monitoring"
+  retention: "90d"
+  shared_with:
+    - signal-analyzer
+    - backtest-executor
+config:
+  max_concurrent_tasks: 5
+  timeout_ms: 10000
+  retry_policy: "none"
+  priority: "critical"
+  budget:
+    tokens: 25000
+    cost_limit_usd: 1.0

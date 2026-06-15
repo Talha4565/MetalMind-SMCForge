@@ -76,6 +76,23 @@ BASELINE_CONFIG = {
 }
 
 # ============================================================================
+# ASSET-SPECIFIC PARAMETERS
+# ============================================================================
+# Gold has higher volatility, so higher thresholds work
+GOLD_LABEL_PARAMS = {
+    "take_profit_pct": 0.0045,   # 0.45% for Gold (higher volatility)
+    "stop_loss_pct": 0.0015,     # 0.15% for Gold
+    "max_bars": 6                # Look ahead 6 bars (90 minutes on 15m)
+}
+
+# Silver has lower volatility, needs lower thresholds to generate positive labels
+SILVER_LABEL_PARAMS = {
+    "take_profit_pct": 0.003,    # 0.3% for Silver (lower volatility)
+    "stop_loss_pct": 0.001,      # 0.1% for Silver
+    "max_bars": 6                # Look ahead 6 bars (90 minutes on 15m)
+}
+
+# ============================================================================
 # FEATURE ENGINEERING CONFIGURATION
 # ============================================================================
 FEATURE_CONFIG = {
@@ -198,9 +215,12 @@ def get_asset_file(asset: str, timeframe: str) -> Path:
     """Get file path for specific asset and timeframe."""
     return ASSETS[asset]["files"][timeframe]
 
-def get_label_params():
-    """Get label generation parameters."""
-    return BASELINE_CONFIG["label_params"]
+def get_label_params(asset: str = "gold"):
+    """Get label generation parameters specific to the asset."""
+    if asset.lower() == "silver":
+        return SILVER_LABEL_PARAMS
+    else:  # Default to Gold
+        return GOLD_LABEL_PARAMS
 
 def get_session_times():
     """Get trading session filter times."""

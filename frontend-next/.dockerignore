@@ -1,0 +1,13 @@
+# Frontend Docker build context ignore rules
+node_modules/
+.next/
+out/
+build/
+dist/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+.DS_Store
+.git
+.gitignore
+.dockerignore

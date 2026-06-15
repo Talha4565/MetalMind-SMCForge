@@ -1,0 +1,7 @@
+{
+  "asset": "silver",
+  "started_at": "2026-06-16T03:18:49.871456",
+  "status": "failed",
+  "error": "Primary timeframe 15m not loaded",
+  "completed_at": "2026-06-16T03:18:51.598139"
+}

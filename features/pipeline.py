@@ -13,7 +13,7 @@ from .labels import generate_labels
 logger = logging.getLogger(__name__)
 
 
-def engineer_all_features(df: pd.DataFrame, add_labels: bool = True) -> pd.DataFrame:
+def engineer_all_features(df: pd.DataFrame, add_labels: bool = True, asset: str = "gold") -> pd.DataFrame:
     """
     Apply complete feature engineering pipeline.
     
@@ -26,6 +26,7 @@ def engineer_all_features(df: pd.DataFrame, add_labels: bool = True) -> pd.DataF
     Args:
         df: Raw DataFrame with OHLC data (can be multi-timeframe aligned)
         add_labels: Whether to generate target labels
+        asset: Asset name ("gold" or "silver") for asset-specific label parameters
     
     Returns:
         DataFrame with all features engineered
@@ -51,8 +52,8 @@ def engineer_all_features(df: pd.DataFrame, add_labels: bool = True) -> pd.DataF
     
     # 4. Labels (if requested)
     if add_labels:
-        logger.info("Generating target labels...")
-        df['target'] = generate_labels(df)
+        logger.info(f"Generating target labels for {asset}...")
+        df['target'] = generate_labels(df, asset=asset)
     
     # Drop NaNs from feature computation
     rows_before = len(df)

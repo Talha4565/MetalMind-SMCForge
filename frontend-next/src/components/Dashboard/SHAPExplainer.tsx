@@ -31,11 +31,11 @@ export default function SHAPExplainer({ prediction, className }: SHAPExplainerPr
   );
 
   return (
-    <Card className={cn("bg-slate-900 border-slate-800", className)}>
+    <Card className={cn("bg-card border-border", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center gap-2">
           <BarChart3 className="w-5 h-5 text-blue-400" />
-          <CardTitle className="text-lg font-bold text-slate-200">
+          <CardTitle className="text-lg font-bold text-card-foreground">
             Feature Importance Analysis
           </CardTitle>
         </div>
@@ -80,7 +80,7 @@ export default function SHAPExplainer({ prediction, className }: SHAPExplainerPr
 
                   {/* Contribution Bar */}
                   <div className="relative">
-                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all duration-500",
@@ -113,17 +113,17 @@ export default function SHAPExplainer({ prediction, className }: SHAPExplainerPr
 
         {/* Summary Stats */}
         {sortedShapValues.length > 0 && (
-          <div className="pt-4 border-t border-slate-800">
+          <div className="pt-4 border-t border-border">
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-widest">Top Contributor</p>
-                <p className="text-sm font-bold text-slate-200 mt-1">
+                <p className="text-sm font-bold text-card-foreground mt-1">
                   {sortedShapValues[0]?.feature.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'N/A'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-widest">Impact Range</p>
-                <p className="text-sm font-bold text-slate-200 mt-1">
+                <p className="text-sm font-bold text-card-foreground mt-1">
                   {Math.min(...sortedShapValues.map(s => s.contribution)).toFixed(2)} to {Math.max(...sortedShapValues.map(s => s.contribution)).toFixed(2)}
                 </p>
               </div>
