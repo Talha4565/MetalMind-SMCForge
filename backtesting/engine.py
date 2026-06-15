@@ -37,10 +37,11 @@ class BacktestEngine:
                  initial_capital: float = None,
                  risk_per_trade: float = None,
                  commission_pct: float = None,
-                 slippage_pct: float = None):
+                 slippage_pct: float = None,
+                 asset: str = "gold"):
         
         config = BACKTEST_CONFIG
-        label_params = get_label_params()
+        label_params = get_label_params(asset)
         
         self.initial_capital = initial_capital or config['initial_capital']
         self.risk_per_trade = risk_per_trade or config['risk_per_trade_usd']
@@ -50,6 +51,7 @@ class BacktestEngine:
         self.tp_pct = label_params['take_profit_pct']
         self.sl_pct = label_params['stop_loss_pct']
         self.max_bars = label_params['max_bars']
+        self.asset = asset
         
         self.trades: List[Trade] = []
         self.equity_curve = []
@@ -251,8 +253,12 @@ class BacktestEngine:
             'session_performance': session_performance
         }
         
-        output_file = output_dir / 'latest.json'
+        output_file = output_dir / f'{self.asset}_backtest.json'
         with open(output_file, 'w') as f:
+            json.dump(output, f, indent=2)
+        
+        latest_file = output_dir / 'latest.json'
+        with open(latest_file, 'w') as f:
             json.dump(output, f, indent=2)
         
         logger.info(f"Saved backtest results to {output_file}")
@@ -320,6 +326,7 @@ class BacktestEngine:
         equity_series = pd.Series(self.equity_curve)
         drawdown = (equity_series / equity_series.cummax() - 1)
         max_drawdown = drawdown.min()
+        max_drawdown_pct = max_drawdown * 100
         
         # Sharpe ratio (annualized, assuming 252 trading days)
         if len(pnls) > 1:
@@ -327,6 +334,21 @@ class BacktestEngine:
             sharpe = (returns.mean() / returns.std()) * np.sqrt(252) if returns.std() != 0 else 0
         else:
             sharpe = 0
+        
+        # Sortino ratio (only downside deviation)
+        if len(pnls) > 1:
+            returns = pd.Series(pnls) / self.initial_capital
+            downside_returns = returns[returns < 0]
+            downside_std = downside_returns.std() if len(downside_returns) > 0 else 0
+            sortino = (returns.mean() / downside_std) * np.sqrt(252) if downside_std != 0 else np.inf
+        else:
+            sortino = 0
+        
+        # Calmar ratio (annual return / max drawdown)
+        # Assuming ~250 trading days per year
+        days_trading = len(self.trades)  # Rough estimate
+        annual_return = (total_return_pct / 100) * (250 / max(days_trading, 1))
+        calmar = annual_return / abs(max_drawdown) if max_drawdown != 0 else np.inf
         
         return {
             'n_trades': n_trades,
@@ -336,8 +358,10 @@ class BacktestEngine:
             'profit_factor': profit_factor,
             'total_return_usd': total_return,
             'total_return_pct': total_return_pct,
-            'max_drawdown_pct': max_drawdown * 100,
-            'sharpe_ratio': sharpe
+            'max_drawdown_pct': max_drawdown_pct,
+            'sharpe_ratio': sharpe,
+            'sortino_ratio': sortino,
+            'calmar_ratio': calmar
         }
     
     def print_summary(self):
@@ -358,6 +382,9 @@ class BacktestEngine:
         print(f"Profit Factor:      {metrics['profit_factor']:.2f}")
         print(f"")
         print(f"Max Drawdown:       {metrics['max_drawdown_pct']:.2f}%")
+        print(f"Sharpe Ratio:       {metrics['sharpe_ratio']:.2f}")
+        print(f"Sortino Ratio:      {metrics['sortino_ratio']:.2f}")
+        print(f"Calmar Ratio:       {metrics['calmar_ratio']:.2f}")
         print(f"Sharpe Ratio:       {metrics['sharpe_ratio']:.2f}")
         print("=" * 60)
 

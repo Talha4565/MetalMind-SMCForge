@@ -3,12 +3,15 @@ Flask API for ML Signals Dashboard
 Serves predictions, backtest results, and SHAP explainability data.
 """
 
+import os
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_compress import Compress  # FIXED: Add compression
 from flask_socketio import SocketIO, emit
+from werkzeug.middleware.proxy_fix import ProxyFix
 import pickle
 import pandas as pd
 import json  # FIXED: Removed duplicate import
@@ -18,6 +21,19 @@ import sys
 from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 import threading
+import time
+from typing import Dict, Any
+import threading
+import numpy as np
+
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
+
+# Load environment variables from .env if present
+load_dotenv()
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -25,22 +41,85 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from data.loaders import load_gold_data, load_silver_data, load_asset_data
 from features.pipeline import engineer_all_features
 
-# Import database and authentication
-from api.app.database import init_database
+# Import extensions, database and authentication
+from api.app.extensions import limiter, bcrypt, migrate
+from api.app.database import init_database, db
 from api.app.auth import init_auth, token_required
 from api.app.watchlist import watchlist_bp
 from api.app.profile import profile_bp
 from api.app.middleware.error_handler import register_error_handlers
 from api.app.etl_routes import etl_bp
-from api.app.etl_dashboard import dashboard_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# WSGI middleware: handle CORS for ALL paths including /socket.io
+ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+
+class CORSProxy:
+    """Wraps every response with CORS headers — sits above engine.io."""
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        origin = environ.get('HTTP_ORIGIN', '')
+        method = environ.get('REQUEST_METHOD', '')
+
+        if origin in ALLOWED_ORIGINS:
+            def add_cors(status, headers, exc_info=None):
+                headers = list(headers)
+                header_names = {h[0].lower() for h in headers}
+                if 'access-control-allow-origin' not in header_names:
+                    headers.append(('Access-Control-Allow-Origin', origin))
+                if 'access-control-allow-credentials' not in header_names:
+                    headers.append(('Access-Control-Allow-Credentials', 'true'))
+                if method == 'OPTIONS':
+                    headers.append(('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS'))
+                    headers.append(('Access-Control-Allow-Headers', 'Content-Type, Authorization'))
+                    headers.append(('Access-Control-Max-Age', '86400'))
+                return start_response(status, headers, exc_info)
+
+            if method == 'OPTIONS' and environ.get('PATH_INFO', '').startswith('/socket.io'):
+                response_body = b''
+                start_response('204 No Content', [
+                    ('Content-Type', 'text/plain'),
+                    ('Content-Length', '0'),
+                    ('Access-Control-Allow-Origin', origin),
+                    ('Access-Control-Allow-Credentials', 'true'),
+                    ('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'),
+                    ('Access-Control-Allow-Headers', 'Content-Type'),
+                    ('Access-Control-Max-Age', '86400'),
+                ])
+                return [response_body]
+
+            return self.app(environ, add_cors)
+
+        return self.app(environ, start_response)
+
+# Apply ProxyFix first
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 # Initialize SocketIO for real-time features
-socketio = SocketIO(app, cors_allowed_origins=["http://localhost:3000"])
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='threading',
+    logger=False,
+    engineio_logger=False,
+    ping_timeout=20,
+    ping_interval=25,
+)
+
+# CRITICAL: Apply CORSProxy AFTER socketio wraps wsgi_app
+# This ensures CORS headers are added to ALL responses including /socket.io
+app.wsgi_app = CORSProxy(app.wsgi_app)
+
+# Global state for real-time features
+connected_clients: Dict[str, Dict[str, Any]] = {}
+prediction_thread = None
+thread_running = False
 
 # FIXED: Register centralized error handlers
 register_error_handlers(app)
@@ -48,19 +127,39 @@ register_error_handlers(app)
 
 @app.after_request
 def set_security_headers(response):
-    """Add security headers to every response."""
+    """Add security headers and CORS to every response."""
+    origin = request.headers.get('Origin', '')
+    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    
+    # CORS for API routes
+    if request.path.startswith('/api') or request.path.startswith('/auth'):
+        if origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            response.headers['Access-Control-Expose-Headers'] = 'Content-Type, Authorization'
+    
     # Content Security Policy — restrict resource loading to known safe origins
+    # For development: allow localhost connections. For production: restrict to your domain.
+    env = app.config.get('ENV', 'production')
+    if env == 'development':
+        connect_src = "connect-src 'self' http://localhost:* ws://localhost:*; "
+    else:
+        connect_src = "connect-src 'self' https://yourdomain.com wss://yourdomain.com; "
+    
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://s.tradingview.com https://unpkg.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-        "img-src 'self' data:; "
-        "connect-src 'self'; "
-        "frame-ancestors 'none';"
+        "img-src 'self' data: https:; "
+        f"{connect_src}"
+        "frame-src https://www.tradingview.com https://s.tradingview.com; "
+        "frame-ancestors 'self';"
     )
-    # Prevent clickjacking
-    response.headers['X-Frame-Options'] = 'DENY'
+    # Prevent clickjacking (allow TradingView iframe)
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     # Prevent MIME-type sniffing
     response.headers['X-Content-Type-Options'] = 'nosniff'
     # Force HTTPS in production
@@ -72,37 +171,23 @@ def set_security_headers(response):
     response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     return response
 
-# FIXED: Configure CORS properly - allow specific origins
-# Next.js frontend served from port 3000
-CORS(app,
-     resources={r"/api/*": {
-         "origins": [
-             "http://localhost:3000",  # Next.js dev server
-             "https://yourdomain.com"  # Production (change this)
-         ],
-         "supports_credentials": True,
-         "methods": ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-         "allow_headers": ['Content-Type', 'Authorization'],
-         "expose_headers": ['Content-Type', 'Authorization']
-     }}
-)
+# CORS handled by flask-socketio for /socket.io and after_request for /api
+# Do NOT use flask-cors — it conflicts with engine.io's CORS handling
 
 # FIXED: Enable response compression for all endpoints
 Compress(app)
 
-# Initialize rate limiter
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
-)
+# FIXED: Initialize extensions correctly for modern Flask (v3.0+)
+limiter.init_app(app)
 
 # Limit request body size — 2MB max (prevents DoS via large payloads)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
 # Initialize database FIRST (auth depends on it)
 init_database(app)
+
+# Initialize Flask-Migrate
+migrate.init_app(app, db)
 
 # Initialize authentication
 init_auth(app)
@@ -111,7 +196,6 @@ init_auth(app)
 app.register_blueprint(watchlist_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(etl_bp)
-app.register_blueprint(dashboard_bp)
 
 
 # FIXED: Encapsulate all global state in proper classes for thread safety and testability
@@ -278,7 +362,7 @@ class BacktestManager:
         with self._lock:
             return self._status.copy()
 
-    def run(self, start_date: str, end_date: str) -> dict:
+    def run(self, start_date: str, end_date: str, asset: str = 'gold') -> dict:
         """Run backtest with lock. Returns result dict."""
         with self._lock:
             if self._status['running']:
@@ -289,7 +373,7 @@ class BacktestManager:
             import subprocess, sys
             project_root = Path(__file__).parent.parent.parent
             result = subprocess.run(
-                [sys.executable, 'run.py', '--mode', 'backtest'],
+                [sys.executable, 'run.py', '--mode', 'backtest', '--asset', asset],
                 capture_output=True,
                 text=True,
                 cwd=str(project_root),
@@ -368,10 +452,52 @@ def health_check():
         }), 503
 
 
+@app.route('/api/market/price', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_live_price():
+    """Fetch real-time price from Yahoo Finance.
+    
+    Query params:
+        asset: gold or silver (default: gold)
+    """
+    try:
+        asset = request.args.get('asset', 'gold').lower()
+        
+        ticker_map = {
+            'gold': 'GC=F',
+            'silver': 'SI=F',
+        }
+        
+        if asset not in ticker_map:
+            return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
+        
+        import requests as req
+        ticker = ticker_map[asset]
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = req.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        chart = resp.json()["chart"]["result"][0]
+        meta = chart["meta"]
+        
+        return jsonify({
+            'asset': asset,
+            'price': float(meta["regularMarketPrice"]),
+            'open': float(meta.get("chartPreviousClose", meta["regularMarketPrice"])),
+            'high': float(meta.get("regularMarketPrice", 0)),
+            'low': float(meta.get("regularMarketPrice", 0)),
+            'volume': int(meta.get("regularMarketVolume", 0)),
+            'timestamp': __import__('datetime').datetime.now().isoformat(),
+        })
+    
+    except Exception as e:
+        logger.error(f"Error fetching live price: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/predictions/latest', methods=['GET'])
-@token_required
 @limiter.limit("100 per minute")  # FIXED: Add rate limiting
-def get_latest_predictions(current_user_email):
+def get_latest_predictions():
     """Get latest predictions for live monitoring.
     
     Query params:
@@ -418,28 +544,89 @@ def get_latest_predictions(current_user_email):
         # Get most recent N bars
         recent_data = df.iloc[-limit:].copy()
         
-        # Use all feature columns except datetime/target if feature_names not available
+        # FIXED: Robustly align column names with model expectations
+        # Use a copy for prediction to avoid breaking the response preparation
+        X_input = recent_data.copy()
+        
         if feature_names is not None:
-            X = recent_data[feature_names]
+            # Create a normalized mapping for current columns
+            current_cols = X_input.columns
+            col_lookup = {}
+            for col in current_cols:
+                norm = col.lower().replace('_', '')
+                col_lookup[norm] = col
+                if norm == 'sessionasia': col_lookup['asia'] = col
+                if norm == 'sessionlondon' or norm == 'sessionldn': col_lookup['ldn'] = col
+                if norm == 'sessionny': col_lookup['ny'] = col
+            
+            rename_map = {}
+            for feat in feature_names:
+                if feat in current_cols: continue
+                feat_norm = feat.lower().replace('_', '')
+                if feat_norm in col_lookup:
+                    rename_map[col_lookup[feat_norm]] = feat
+            
+            if rename_map:
+                logger.info(f"Mapping {len(rename_map)} features for prediction")
+                X_input.rename(columns=rename_map, inplace=True)
+            
+            try:
+                # Reorder and select only needed features
+                X = X_input[feature_names]
+            except KeyError as e:
+                logger.error(f"❌ Final alignment failed. Missing: {e}")
+                available_features = [f for f in feature_names if f in X_input.columns]
+                X = X_input[available_features]
         else:
-            # Get all numeric columns as features
-            X = recent_data.select_dtypes(include=['float64', 'int64'])
+            X = X_input.select_dtypes(include=['float64', 'int64'])
         
         # Get predictions and probabilities
         predictions = model.predict(X)
-        probabilities = model.predict_proba(X)[:, 1]  # Probability of signal
+
+        
+        try:
+            probabilities = model.predict_proba(X)[:, 1]  # Probability of signal
+        except (AttributeError, IndexError):
+            # Fallback for models without predict_proba
+            probabilities = [0.5] * len(predictions)
+        
+        # Compute real SHAP values for the latest bar
+        shap_values_for_response = [{'feature': 'N/A', 'contribution': 0.0}] * len(predictions)
+        try:
+            if SHAP_AVAILABLE and len(X) > 0:
+                explainer = shap.TreeExplainer(model)
+                latest_bar = X.iloc[[-1]]
+                shap_vals = explainer.shap_values(latest_bar)
+                if isinstance(shap_vals, list):
+                    shap_vals = shap_vals[1]
+                shap_vals = shap_vals[0]
+                top_idx = np.argsort(np.abs(shap_vals))[::-1][:5]
+                top_shap = [
+                    {'feature': X.columns[j], 'contribution': float(shap_vals[j])}
+                    for j in top_idx
+                ]
+                shap_values_for_response[-1] = top_shap
+        except Exception as e:
+            logger.warning(f"SHAP computation failed for prediction: {e}")
         
         # Prepare response
         results = []
         for i, (idx, row) in enumerate(recent_data.iterrows()):
+            # Use real SHAP for latest bar, placeholder for others
+            bar_shap = shap_values_for_response[-1] if i == len(recent_data) - 1 else shap_values_for_response[0]
+            
             results.append({
                 'timestamp': idx.isoformat(),
+                'asset': asset.upper(),
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
                 'close': float(row['close']),
+                'price': float(row['close']), # FIXED: Expected by frontend (prediction.price)
                 'signal': int(predictions[i]),
-                'probability': float(probabilities[i])
+                'probability': float(probabilities[i]),
+                'confidence': float(probabilities[i]), # FIXED: Expected by frontend (prediction.confidence)
+                'shap_values': bar_shap
             })
         
         return jsonify({
@@ -481,7 +668,7 @@ def get_backtest_results(current_user_email):
         # FIXED: Use safe mapping instead of string concatenation
         asset_file_map = {
             'gold': 'gold_backtest.json',
-            'silver': 'latest.json',
+            'silver': 'silver_backtest.json',
             'latest': 'latest.json'
         }
 
@@ -514,11 +701,15 @@ def run_backtest(current_user_email):
         params = request.json
         start_date = params.get('start_date')
         end_date = params.get('end_date')
+        asset = params.get('asset', 'gold').lower()
         
-        logger.info(f"Running backtest from {start_date} to {end_date}")
+        if asset not in ['gold', 'silver']:
+            return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
+        
+        logger.info(f"Running {asset} backtest from {start_date} to {end_date}")
         
         # FIXED: Use BacktestManager for thread-safe execution
-        result, status_code = backtest_manager.run(start_date, end_date)
+        result, status_code = backtest_manager.run(start_date, end_date, asset=asset)
         return jsonify(result), status_code
     
     except Exception as e:
@@ -530,36 +721,68 @@ def run_backtest(current_user_email):
 @token_required
 @limiter.limit("60 per minute")  # FIXED: Add rate limiting
 def get_shap_feature_importance(current_user_email):
-    """Get SHAP feature importance data."""
-    try:
-        # Load SHAP values if they exist (absolute path — works in Docker)
-        project_root = Path(__file__).parent.parent.parent
-        shap_file = project_root / 'reports' / 'shap_plots' / 'shap_values.json'
+        """Get SHAP feature importance data with real computation.
         
-        if shap_file.exists():
-            with open(shap_file, 'r') as f:
-                data = json.load(f)
-            return jsonify(data)
-        else:
-            # Return mock data if SHAP analysis hasn't been run
-            return jsonify({
-                'feature_importance': [
-                    {'feature': 'vwap_distance_5m', 'importance': 0.15},
-                    {'feature': 'vwap_distance_15m', 'importance': 0.12},
-                    {'feature': 'volume_imbalance', 'importance': 0.10},
-                    {'feature': 'order_flow', 'importance': 0.09},
-                    {'feature': 'trend_strength_15m', 'importance': 0.08},
-                    {'feature': 'fvg_score', 'importance': 0.07},
-                    {'feature': 'liquidity_sweep', 'importance': 0.06},
-                    {'feature': 'smc_signal', 'importance': 0.05},
-                    {'feature': 'volume_spike', 'importance': 0.04},
-                    {'feature': 'volatility_15m', 'importance': 0.03}
-                ]
-            })
-    
-    except Exception as e:
-        logger.error(f"Error loading SHAP data: {e}")
-        return jsonify({'error': str(e)}), 500
+        Query params:
+            asset: "gold" or "silver" (default: gold)
+            recompute: "true" to force recomputation (default: false)
+        """
+        try:
+            from api.app.shap_cache import shap_cache
+            
+            asset = request.args.get('asset', 'gold').lower()
+            recompute = request.args.get('recompute', 'false').lower() == 'true'
+            
+            if not recompute:
+                # Try to return cached data
+                cached = shap_cache.get(asset)
+                if cached.get('computed'):
+                    logger.info(f"Returning cached SHAP data for {asset}")
+                    return jsonify(cached)
+            
+            # Try to compute real SHAP values
+            logger.info(f"Computing SHAP values for {asset}...")
+            
+            # Load model
+            model, feature_names = model_manager.get_or_load_model(asset)
+            if model is None:
+                logger.warning(f"Model not available for {asset}")
+                return jsonify(shap_cache.get(asset))
+            
+            # Load sample data for SHAP computation
+            try:
+                if asset == "gold":
+                    df = load_gold_data(primary_tf="15m", session_filter=True)
+                else:
+                    df = load_silver_data(primary_tf="15m", session_filter=True)
+                
+                # Engineer features
+                df = engineer_all_features(df, add_labels=False, asset=asset)
+                
+                # Drop target if present
+                if 'target' in df.columns:
+                    df = df.drop(columns=['target'])
+                
+                # Sample for SHAP (limit to 1000 for speed)
+                if len(df) > 1000:
+                    df_sample = df.sample(n=1000, random_state=42)
+                else:
+                    df_sample = df
+                
+                # Compute SHAP
+                importance_dict = shap_cache.compute_shap_for_asset(asset, model, df_sample)
+                
+                logger.info(f"✅ SHAP computed for {asset}: {len(importance_dict.get('feature_importance', []))} features")
+                return jsonify(importance_dict)
+            
+            except Exception as e:
+                logger.error(f"Error computing SHAP: {e}")
+                logger.warning(f"Falling back to cached/mock SHAP for {asset}")
+                return jsonify(shap_cache.get(asset))
+        
+        except Exception as e:
+            logger.error(f"Error in SHAP endpoint: {e}")
+            return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/shap/plot', methods=['GET'])
@@ -727,23 +950,171 @@ def get_model_info(current_user_email):
 # REMOVED: Flask UI serving routes - now using Next.js frontend
 # All UI routes removed to make Flask API-only
 
+def start_prediction_updates():
+    """Background thread to emit real-time prediction updates."""
+    global thread_running
+    thread_running = True
+    
+    logger.info("Starting real-time prediction updates thread")
+    
+    while thread_running:
+        try:
+            # Generate predictions for both assets
+            for asset in ['gold', 'silver']:
+                if not connected_clients:
+                    continue
+                    
+                # Check if any clients are subscribed to this asset
+                clients_subscribed = any(
+                    client_data.get('subscriptions', {}).get('predictions', {}).get(asset, False)
+                    for client_data in connected_clients.values()
+                )
+                
+                if not clients_subscribed:
+                    continue
+                
+                # Generate fresh predictions
+                try:
+                    prediction_data = generate_predictions_for_asset(asset)
+                    if prediction_data:
+                        # Emit to all connected clients subscribed to this asset
+                        socketio.emit('predictions', {
+                            'asset': asset,
+                            'predictions': prediction_data['predictions'],
+                            'total_signals': prediction_data['total_signals'],
+                            'timestamp': datetime.utcnow().isoformat(),
+                            'price': prediction_data['current_price']
+                        })
+                        logger.debug(f"Emitted {asset} predictions to {len(connected_clients)} clients")
+                except Exception as e:
+                    logger.error(f"Error generating predictions for {asset}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error in prediction updates thread: {e}")
+            
+        # Wait 30 seconds before next update
+        time.sleep(30)
+    
+    logger.info("Real-time prediction updates thread stopped")
+
+
+def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
+    """Generate predictions for a specific asset using existing loader and model manager."""
+    try:
+        # Load data using the existing asset loader
+        df = load_asset_data(asset=asset, primary_tf='15m', session_filter=True)
+        if df is None or df.empty:
+            logger.warning(f"No data loaded for asset {asset}")
+            return None
+
+        # Engineer features for the model
+        df = engineer_all_features(df, add_labels=False)
+        if df is None or df.empty:
+            logger.warning(f"Feature engineering returned no data for {asset}")
+            return None
+
+        current_price = float(df.iloc[-1]['close']) if 'close' in df.columns else 2000.0
+
+        # Load the model and feature set from ModelManager
+        model, feature_names = model_manager.get_or_load_model(asset)
+        if model is None:
+            logger.warning(f"No model available for asset {asset}")
+            return None
+
+        # Align features with model expectation
+        if feature_names:
+            available_features = [f for f in feature_names if f in df.columns]
+            if not available_features:
+                logger.warning(f"No matching features found for asset {asset}")
+                return None
+            X = df[available_features]
+        else:
+            X = df.select_dtypes(include=['float64', 'int64'])
+
+        if X.empty:
+            logger.warning(f"No valid feature columns for asset {asset}")
+            return None
+
+        predictions = model.predict(X)
+        try:
+            probabilities = model.predict_proba(X)[:, 1]
+        except Exception:
+            probabilities = [0.5] * len(predictions)
+
+        last_n = 10
+        start = max(0, len(predictions) - last_n)
+        results = []
+        for idx in range(start, len(predictions)):
+            results.append({
+                'timestamp': df.index[idx].isoformat() if hasattr(df.index[idx], 'isoformat') else str(df.index[idx]),
+                'signal': int(predictions[idx]),
+                'probability': float(probabilities[idx]),
+                'price': float(df.iloc[idx]['close']) if 'close' in df.columns else current_price,
+            })
+
+        return {
+            'predictions': results,
+            'total_signals': int(sum(results_item['signal'] for results_item in results)),
+            'current_price': current_price,
+        }
+    except Exception as e:
+        logger.error(f"generate_predictions_for_asset({asset}) failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 # WebSocket event handlers for real-time features
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection."""
-    logger.info('Client connected')
+    global prediction_thread, thread_running
+    
+    client_id = request.sid
+    connected_clients[client_id] = {
+        'connected_at': datetime.utcnow(),
+        'subscriptions': {}
+    }
+    
+    logger.info(f'Client {client_id} connected. Total clients: {len(connected_clients)}')
     emit('connected', {'status': 'success'})
+    
+    # Start prediction thread if this is the first client
+    if len(connected_clients) == 1 and (prediction_thread is None or not thread_running):
+        prediction_thread = threading.Thread(target=start_prediction_updates, daemon=True)
+        prediction_thread.start()
+        logger.info("Started prediction updates thread")
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection."""
-    logger.info('Client disconnected')
+    global thread_running
+    
+    client_id = request.sid
+    if client_id in connected_clients:
+        del connected_clients[client_id]
+        logger.info(f'Client {client_id} disconnected. Total clients: {len(connected_clients)}')
+    
+    # Stop thread if no clients remain
+    if len(connected_clients) == 0 and thread_running:
+        thread_running = False
+        logger.info("Stopped prediction updates thread")
 
 @socketio.on('subscribe_predictions')
 def handle_subscribe_predictions(data):
     """Subscribe to real-time prediction updates."""
-    logger.info(f'Client subscribed to predictions: {data}')
-    emit('subscription_confirmed', {'type': 'predictions'})
+    client_id = request.sid
+    asset = data.get('asset', 'gold') if isinstance(data, dict) else 'gold'
+    
+    if client_id in connected_clients:
+        if 'predictions' not in connected_clients[client_id]['subscriptions']:
+            connected_clients[client_id]['subscriptions']['predictions'] = {}
+        connected_clients[client_id]['subscriptions']['predictions'][asset] = True
+        
+        logger.info(f'Client {client_id} subscribed to {asset} predictions')
+        emit('subscription_confirmed', {'type': 'predictions', 'asset': asset})
+    else:
+        logger.warning(f'Unknown client {client_id} tried to subscribe to predictions')
 
 @socketio.on('subscribe_etl_status')
 def handle_subscribe_etl_status(data):

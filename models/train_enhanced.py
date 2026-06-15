@@ -58,7 +58,7 @@ class EnhancedModelTrainer:
         
         # Apply feature engineering
         logger.info("Applying complete feature engineering pipeline...")
-        df = engineer_all_features(df, add_labels=True)
+        df = engineer_all_features(df, add_labels=True, asset=self.asset)
         logger.info(f"Engineered {len(df.columns)} features")
         
         # Split data

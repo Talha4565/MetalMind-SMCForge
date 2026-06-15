@@ -25,6 +25,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def api_mode(args):
+    """API mode: Start the Flask SocketIO server."""
+    logger.info("🚀 Starting API server mode...")
+    try:
+        from api.app.main import app, socketio
+        # Ensure we run on host 0.0.0.0 and port 5000 as configured in main.py
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    except ImportError as e:
+        logger.error(f"❌ Failed to import API dependencies: {e}")
+    except Exception as e:
+        logger.error(f"❌ API Server error: {e}")
+
+
 def train_mode(args):
     """Training mode: Train enhanced model."""
     logger.info("🚀 Starting training mode...")
@@ -39,13 +52,17 @@ def train_mode(args):
 
 def backtest_mode(args):
     """Backtest mode: Test trained model."""
-    logger.info("🚀 Starting backtest mode...")
+    logger.info(f"🚀 Starting backtest mode for {args.asset}...")
     
     import pickle
     from config.settings import MODEL_CONFIG
     
-    # Load model
-    model_path = MODEL_CONFIG['enhanced_model_path']
+    # Load model based on asset
+    if args.asset == 'silver':
+        model_path = MODEL_CONFIG['enhanced_model_path'].parent / 'processed' / 'silver_model_enhanced.pkl'
+    else:
+        model_path = MODEL_CONFIG['enhanced_model_path']
+    
     if not model_path.exists():
         logger.error(f"Model not found at {model_path}. Train first with --mode train")
         return
@@ -54,7 +71,7 @@ def backtest_mode(args):
         model = pickle.load(f)
     
     # Load and prepare data
-    trainer = EnhancedModelTrainer(primary_tf=args.timeframe)
+    trainer = EnhancedModelTrainer(primary_tf=args.timeframe, asset=args.asset)
     trainer.prepare_data(session_filter=True)
     
     # Get test predictions
@@ -67,7 +84,7 @@ def backtest_mode(args):
     test_df['low'] = test_df.get('low', trainer.test_x.iloc[:, 2])
     test_df['close'] = test_df.get('close', trainer.test_x.iloc[:, 3])
     
-    engine = BacktestEngine()
+    engine = BacktestEngine(asset=args.asset)
     results = engine.run_backtest(test_df, test_pred)
     
     # Print summary
@@ -160,7 +177,7 @@ def main():
     
     parser.add_argument(
         '--mode',
-        choices=['train', 'backtest', 'explain', 'full'],
+        choices=['train', 'backtest', 'explain', 'full', 'api'],
         default='full',
         help='Operation mode (default: full)'
     )
@@ -178,6 +195,13 @@ def main():
         help='Number of Optuna trials for hyperparameter tuning (default: 30)'
     )
     
+    parser.add_argument(
+        '--asset',
+        choices=['gold', 'silver'],
+        default='gold',
+        help='Asset to backtest (default: gold)'
+    )
+    
     args = parser.parse_args()
     
     # Route to appropriate mode
@@ -185,7 +209,8 @@ def main():
         'train': train_mode,
         'backtest': backtest_mode,
         'explain': explain_mode,
-        'full': full_pipeline
+        'full': full_pipeline,
+        'api': api_mode
     }
     
     modes[args.mode](args)
