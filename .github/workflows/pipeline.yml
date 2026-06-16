@@ -1,0 +1,74 @@
+name: MetalMind Pipeline
+
+on:
+  schedule:
+    # Update data every 15 minutes
+    - cron: '*/15 * * * *'
+    # Retrain model daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r api/requirements.txt yfinance
+      
+      - name: Update gold data
+        run: python run_pipeline.py --mode update --asset gold
+      
+      - name: Update silver data
+        run: python run_pipeline.py --mode update --asset silver
+      
+      - name: Check freshness
+        run: python run_pipeline.py --mode freshness
+      
+      - name: Commit updated data
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add "Gold Dataset/" "Silver Dataset/"
+          git diff --staged --quiet || git commit -m "data: automated update $(date +'%Y-%m-%d %H:%M')"
+          git push
+
+  retrain-model:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 3 * * *'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r api/requirements.txt yfinance
+      
+      - name: Retrain gold model
+        run: python run_pipeline.py --mode retrain --asset gold --trials 10
+      
+      - name: Retrain silver model
+        run: python run_pipeline.py --mode retrain --asset silver --trials 10
+      
+      - name: Check pipeline status
+        run: python run_pipeline.py --mode status
+      
+      - name: Commit updated models
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add models/ reports/training_logs/
+          git diff --staged --quiet || git commit -m "model: daily retrain $(date +'%Y-%m-%d')"
+          git push
