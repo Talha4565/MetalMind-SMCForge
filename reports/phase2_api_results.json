@@ -1,0 +1,103 @@
+{
+  "summary": {
+    "total": 19,
+    "passed": 18
+  },
+  "tests": [
+    {
+      "test": "API health check",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Live price for gold",
+      "passed": true,
+      "detail": "Price: $4365.0"
+    },
+    {
+      "test": "Live price for silver",
+      "passed": true,
+      "detail": "Price: $70.53"
+    },
+    {
+      "test": "Predictions for gold",
+      "passed": true,
+      "detail": "Signal: 0, Confidence: 41.8%"
+    },
+    {
+      "test": "SHAP values present for gold",
+      "passed": true,
+      "detail": "5 features"
+    },
+    {
+      "test": "Predictions for silver",
+      "passed": true,
+      "detail": "Signal: 0, Confidence: 0.3%"
+    },
+    {
+      "test": "SHAP values present for silver",
+      "passed": true,
+      "detail": "5 features"
+    },
+    {
+      "test": "SHAP endpoint responds",
+      "passed": true,
+      "detail": "Status: 401"
+    },
+    {
+      "test": "Model info endpoint",
+      "passed": false,
+      "detail": "Status: 401"
+    },
+    {
+      "test": "CSRF endpoint",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Session endpoint",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Page /",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /auth/login",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /auth/register",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /dashboard",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /dashboard/risk",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /dashboard/profile",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /dashboard/watchlist",
+      "passed": true,
+      "detail": "Status: 200"
+    },
+    {
+      "test": "Page /backtest",
+      "passed": true,
+      "detail": "Status: 200"
+    }
+  ]
+}

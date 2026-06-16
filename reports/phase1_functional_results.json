@@ -1,0 +1,231 @@
+{
+  "summary": {
+    "total": 37,
+    "passed": 35,
+    "failed": 2
+  },
+  "tests": [
+    {
+      "test": "Register page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.424556"
+    },
+    {
+      "test": "Email field exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.691381"
+    },
+    {
+      "test": "Password field exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.711417"
+    },
+    {
+      "test": "Confirm password field exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.800534"
+    },
+    {
+      "test": "Theme toggle exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.827277"
+    },
+    {
+      "test": "Brand panel visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:52.893703"
+    },
+    {
+      "test": "Login page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:55.530393"
+    },
+    {
+      "test": "Email field exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:55.629967"
+    },
+    {
+      "test": "Password field exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:55.665662"
+    },
+    {
+      "test": "Password starts hidden",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:55.896928"
+    },
+    {
+      "test": "Toggle shows password",
+      "passed": false,
+      "detail": "",
+      "time": "2026-06-16T15:13:56.760606"
+    },
+    {
+      "test": "Toggle hides password",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:13:57.260843"
+    },
+    {
+      "test": "Register redirects to login",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:04.537571"
+    },
+    {
+      "test": "Login redirects to dashboard",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:10.761336"
+    },
+    {
+      "test": "Wrong password stays on login",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:17.060864"
+    },
+    {
+      "test": "Dashboard loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.260334"
+    },
+    {
+      "test": "Header exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.419820"
+    },
+    {
+      "test": "Sidebar exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.435450"
+    },
+    {
+      "test": "Theme toggle exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.466568"
+    },
+    {
+      "test": "Live price shows",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.493481"
+    },
+    {
+      "test": "Signal card exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.509904"
+    },
+    {
+      "test": "Confidence card exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.525709"
+    },
+    {
+      "test": "TradingView chart loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:33.556002"
+    },
+    {
+      "test": "Risk page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.307207"
+    },
+    {
+      "test": "Balance input exists",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.318012"
+    },
+    {
+      "test": "Risk profiles exist",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.336244"
+    },
+    {
+      "test": "Risk parameters visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.360174"
+    },
+    {
+      "test": "Risk/Reward visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.373209"
+    },
+    {
+      "test": "Price levels visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:41.406322"
+    },
+    {
+      "test": "Backtest page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:49.777452"
+    },
+    {
+      "test": "Has dashboard layout",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:14:49.895152"
+    },
+    {
+      "test": "Watchlist page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:15:06.185480"
+    },
+    {
+      "test": "Has dashboard layout",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:15:06.241069"
+    },
+    {
+      "test": "Profile page loads",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:15:11.768854"
+    },
+    {
+      "test": "Profile form visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:15:11.866671"
+    },
+    {
+      "test": "Security section visible",
+      "passed": true,
+      "detail": "",
+      "time": "2026-06-16T15:15:11.893269"
+    },
+    {
+      "test": "Theme toggle",
+      "passed": false,
+      "detail": "Page.goto: Timeout 15000ms exceeded.\nCall log:\n  - navigating to \"http://localho",
+      "time": "2026-06-16T15:15:26.911088"
+    }
+  ]
+}
