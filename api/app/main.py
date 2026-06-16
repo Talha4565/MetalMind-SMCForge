@@ -1115,6 +1115,19 @@ def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
         return None
 
 
+@app.route('/api/pipeline/status', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_pipeline_status():
+    """Get pipeline health, status, data freshness, and model backups."""
+    try:
+        from etl.orchestrator import PipelineOrchestrator
+        orch = PipelineOrchestrator()
+        return jsonify(orch.get_dashboard_data())
+    except Exception as e:
+        logger.error(f"Error getting pipeline status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # WebSocket event handlers for real-time features
 @socketio.on('connect')
 def handle_connect():
