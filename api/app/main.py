@@ -659,16 +659,6 @@ def get_latest_predictions():
                 'shap_values': bar_shap
             })
         
-        return jsonify({
-            'asset': asset,
-            'predictions': results,
-            'total_signals': int(predictions.sum()),
-            'data_range': {
-                'start': recent_data.index.min().isoformat(),
-                'end': recent_data.index.max().isoformat()
-            }
-        })
-        
         # Log the latest prediction and check for alerts
         if results:
             latest = results[-1]
@@ -689,7 +679,17 @@ def get_latest_predictions():
                     price=latest['price'],
                     shap_values=latest.get('shap_values', [])
                 )
-    
+        
+        return jsonify({
+            'asset': asset,
+            'predictions': results,
+            'total_signals': int(predictions.sum()),
+            'data_range': {
+                'start': recent_data.index.min().isoformat(),
+                'end': recent_data.index.max().isoformat()
+            }
+        })
+
     except Exception as e:
         logger.error(f"Error getting predictions: {e}")
         import traceback
