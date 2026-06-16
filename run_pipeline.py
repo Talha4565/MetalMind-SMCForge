@@ -2,11 +2,14 @@
 Automated pipeline: Fetch live data → Append to CSVs → Retrain model.
 
 Usage:
-    python run_pipeline.py --backfill          # Fill gap from Sept 2024 to today
-    python run_pipeline.py --update            # Fetch latest candles only
-    python run_pipeline.py --retrain           # Retrain model on full data
-    python run_pipeline.py --full              # Backfill + Retrain
-    python run_pipeline.py --schedule          # Run continuously (15min update + 24h retrain)
+    python run_pipeline.py --mode backfill          # Fill gap from Sept 2024 to today
+    python run_pipeline.py --mode update            # Fetch latest candles only
+    python run_pipeline.py --mode retrain           # Retrain model on full data
+    python run_pipeline.py --mode full              # Backfill + Retrain
+    python run_pipeline.py --mode schedule          # Run continuously (15min update + 24h retrain)
+    python run_pipeline.py --mode status            # Show pipeline status
+    python run_pipeline.py --mode freshness         # Check data freshness
+    python run_pipeline.py --mode backups           # List model backups
 """
 
 import sys
@@ -20,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from etl.extractors.yfinance_extractor import YFinanceExtractor
 from etl.loaders.csv_append_loader import CSVAppendLoader
+from etl.orchestrator import PipelineOrchestrator
 from config.settings import GOLD_DATASET_DIR, SILVER_DATASET_DIR, REPORTS_DIR
 
 logging.basicConfig(
@@ -27,6 +31,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Global orchestrator instance
+orchestrator = PipelineOrchestrator()
 
 
 def run_fetch_and_append(asset: str, intervals: list = None):
@@ -151,7 +158,7 @@ def run_schedule():
 
 def main():
     parser = argparse.ArgumentParser(description='ML-Signals Automated Pipeline')
-    parser.add_argument('--mode', choices=['backfill', 'update', 'retrain', 'full', 'schedule'],
+    parser.add_argument('--mode', choices=['backfill', 'update', 'retrain', 'full', 'schedule', 'status', 'freshness', 'backups'],
                        default='update', help='Pipeline mode')
     parser.add_argument('--asset', choices=['gold', 'silver'], default='gold',
                        help='Asset to process')
@@ -169,6 +176,20 @@ def main():
         run_full_pipeline(args.asset)
     elif args.mode == 'schedule':
         run_schedule()
+    elif args.mode == 'status':
+        print(json.dumps(orchestrator.get_dashboard_data(), indent=2, default=str))
+    elif args.mode == 'freshness':
+        for asset in ['gold', 'silver']:
+            result = orchestrator.freshness.check(asset)
+            status = "FRESH" if result['is_fresh'] else "STALE"
+            print(f"{asset.upper()}: {status} - {result['message']} (rows: {result['rows']})")
+    elif args.mode == 'backups':
+        backups = orchestrator.versioning.list_backups()
+        if backups:
+            for b in backups:
+                print(f"  {b['name']} ({b['size_mb']} MB)")
+        else:
+            print("No backups found")
 
 
 if __name__ == '__main__':
