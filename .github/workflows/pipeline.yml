@@ -58,6 +58,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r api/requirements.txt yfinance --quiet
       
+      - name: Update data before retrain
+        run: |
+          python run_pipeline.py --mode update --asset gold
+          python run_pipeline.py --mode update --asset silver
+      
       - name: Retrain gold model
         run: python run_pipeline.py --mode retrain --asset gold --trials 10
       
