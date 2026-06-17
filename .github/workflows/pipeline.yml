@@ -40,10 +40,13 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main
           git add -f "Gold Dataset/" "Silver Dataset/"
-          git diff --staged --quiet || git commit -m "data: automated update $(date +'%Y-%m-%d %H:%M')"
-          git push
+          git diff --staged --quiet && exit 0
+          git commit -m "data: automated update $(date +'%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep 5
+          done
 
   retrain-model:
     runs-on: ubuntu-latest
@@ -80,7 +83,10 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git pull --rebase origin main
           git add models/ reports/training_logs/
-          git diff --staged --quiet || git commit -m "model: daily retrain $(date +'%Y-%m-%d')"
-          git push
+          git diff --staged --quiet && exit 0
+          git commit -m "model: daily retrain $(date +'%Y-%m-%d')"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep 5
+          done
