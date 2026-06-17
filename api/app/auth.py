@@ -384,6 +384,35 @@ def login():
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
 
+@auth_bp.route('/refresh', methods=['POST'])
+def refresh_access_token():
+    """Refresh an expired access token using a valid refresh token."""
+    refresh_token = None
+    
+    # Try request body first
+    data = request.get_json(silent=True) or {}
+    refresh_token = data.get('refresh_token')
+    
+    # Fallback to cookie
+    if not refresh_token:
+        refresh_token = request.cookies.get('refresh_token')
+    
+    if not refresh_token:
+        return jsonify({'error': 'Refresh token required'}), 400
+    
+    payload = verify_token(refresh_token, token_type='refresh')
+    if not payload:
+        return jsonify({'error': 'Invalid or expired refresh token'}), 401
+    
+    # Issue new access token
+    new_access_token = create_access_token(payload['email'])
+    
+    return jsonify({
+        'access_token': new_access_token,
+        'token_type': 'Bearer'
+    }), 200
+
+
 # Initialize extensions correctly from shared instances
 def init_auth(app):
     """Initialize authentication module with Flask app."""

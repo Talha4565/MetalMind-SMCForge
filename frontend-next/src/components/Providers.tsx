@@ -12,6 +12,9 @@ function SessionSync() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.accessToken) {
       apiClient.setToken(session.user.accessToken as string);
+      if (session.user.refreshToken) {
+        apiClient.setRefreshToken(session.user.refreshToken as string);
+      }
       return;
     }
 
