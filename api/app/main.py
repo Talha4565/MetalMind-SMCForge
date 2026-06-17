@@ -1133,6 +1133,84 @@ def get_pipeline_status():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/backtest/export', methods=['GET'])
+@limiter.limit("30 per minute")
+def export_backtest():
+    """Export backtest results as CSV or PDF.
+    
+    Query params:
+        format: 'csv' or 'pdf' (default: csv)
+        type: 'trades', 'summary', 'equity', or 'all' (default: all, CSV only)
+    """
+    try:
+        from backtesting.export import BacktestExporter
+        import io
+
+        fmt = request.args.get('format', 'csv').lower()
+        export_type = request.args.get('type', 'all').lower()
+
+        results_path = REPORTS_DIR / 'backtest_results' / 'latest.json'
+        if not results_path.exists():
+            return jsonify({'error': 'No backtest results found. Run a backtest first.'}), 404
+
+        with open(results_path, 'r') as f:
+            data = json.load(f)
+
+        exporter = BacktestExporter()
+
+        if fmt == 'pdf':
+            buf = io.BytesIO()
+            success = exporter.export_pdf(data, buf)
+            if not success:
+                return jsonify({'error': 'PDF generation failed'}), 500
+            buf.seek(0)
+            return send_file(buf, mimetype='application/pdf',
+                           as_attachment=True,
+                           download_name='backtest_report.pdf')
+
+        # CSV exports
+        if export_type == 'all':
+            buf = io.BytesIO()
+            writer = io.TextIOWrapper(buf, encoding='utf-8')
+            # Combine all into one CSV
+            import pandas as pd
+            summary_df = pd.DataFrame([data.get('summary', {})])
+            equity_df = pd.DataFrame(data.get('equity_curve', []))
+            trades_df = pd.DataFrame(data.get('trades', []))
+
+            writer.write("# Summary\n")
+            summary_df.to_csv(writer, index=False)
+            writer.write("\n# Equity Curve\n")
+            equity_df.to_csv(writer, index=False)
+            writer.write("\n# Trades\n")
+            trades_df.to_csv(writer, index=False)
+            writer.flush()
+            buf.seek(0)
+            return send_file(buf, mimetype='text/csv',
+                           as_attachment=True,
+                           download_name='backtest_report.csv')
+
+        # Individual CSV export
+        buf = io.BytesIO()
+        if export_type == 'trades':
+            exporter.export_trades_csv(data, buf)
+        elif export_type == 'summary':
+            exporter.export_summary_csv(data, buf)
+        elif export_type == 'equity':
+            exporter.export_equity_csv(data, buf)
+        else:
+            return jsonify({'error': f'Unknown export type: {export_type}'}), 400
+
+        buf.seek(0)
+        return send_file(buf, mimetype='text/csv',
+                       as_attachment=True,
+                       download_name=f'backtest_{export_type}.csv')
+
+    except Exception as e:
+        logger.error(f"Error exporting backtest: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # WebSocket event handlers for real-time features
 @socketio.on('connect')
 def handle_connect():
