@@ -11,13 +11,6 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from models.train_enhanced import train_enhanced_model, EnhancedModelTrainer
-from backtesting.engine import BacktestEngine
-from explainability.shap_analyzer import ShapAnalyzer
-from data.loaders import load_gold_data
-from features.pipeline import engineer_all_features
-from config.settings import PROJECT_ROOT
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -41,6 +34,7 @@ def api_mode(args):
 def train_mode(args):
     """Training mode: Train enhanced model."""
     logger.info("🚀 Starting training mode...")
+    from models.train_enhanced import train_enhanced_model
     
     model, results = train_enhanced_model(
         primary_tf=args.timeframe,
@@ -56,6 +50,8 @@ def backtest_mode(args):
     
     import pickle
     from config.settings import MODEL_CONFIG
+    from models.train_enhanced import EnhancedModelTrainer
+    from backtesting.engine import BacktestEngine
     
     # Load model based on asset
     if args.asset == 'silver':
@@ -99,6 +95,8 @@ def explain_mode(args):
     
     import pickle
     from config.settings import MODEL_CONFIG, REPORTS_DIR
+    from models.train_enhanced import EnhancedModelTrainer
+    from explainability.shap_analyzer import ShapAnalyzer
     
     # Load model
     model_path = MODEL_CONFIG['enhanced_model_path']
