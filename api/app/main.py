@@ -402,7 +402,7 @@ class BacktestManager:
 
 # FIXED: Initialize managers (no global dicts!)
 model_manager = ModelManager()
-prediction_cache = PredictionCache(ttl_seconds=60)
+prediction_cache = PredictionCache(ttl_seconds=300)
 backtest_manager = BacktestManager()
 file_cache = FileCache(ttl_seconds=60)  # FIXED: Cache for JSON files
 
@@ -1050,29 +1050,34 @@ def start_prediction_updates():
 
 
 def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
-    """Generate predictions for a specific asset using existing loader and model manager."""
+    """Generate predictions for a specific asset using cache-aware data loading."""
     try:
-        # Load data using the existing asset loader
-        df = load_asset_data(asset=asset, primary_tf='15m', session_filter=True)
-        if df is None or df.empty:
-            logger.warning(f"No data loaded for asset {asset}")
-            return None
+        cache_key = f"{asset}_predictions"
+        df = prediction_cache.get(cache_key)
 
-        # Engineer features for the model
-        df = engineer_all_features(df, add_labels=False)
-        if df is None or df.empty:
-            logger.warning(f"Feature engineering returned no data for {asset}")
-            return None
+        if df is None:
+            logger.info(f"Cache miss for {asset} — loading data and engineering features...")
+            df = load_asset_data(asset=asset, primary_tf='15m', session_filter=True)
+            if df is None or df.empty:
+                logger.warning(f"No data loaded for asset {asset}")
+                return None
+
+            df = engineer_all_features(df, add_labels=False)
+            if df is None or df.empty:
+                logger.warning(f"Feature engineering returned no data for {asset}")
+                return None
+
+            prediction_cache.set(cache_key, df)
+        else:
+            logger.debug(f"Using cached data for {asset}")
 
         current_price = float(df.iloc[-1]['close']) if 'close' in df.columns else 2000.0
 
-        # Load the model and feature set from ModelManager
         model, feature_names = model_manager.get_or_load_model(asset)
         if model is None:
             logger.warning(f"No model available for asset {asset}")
             return None
 
-        # Align features with model expectation
         if feature_names:
             available_features = [f for f in feature_names if f in df.columns]
             if not available_features:
