@@ -9,7 +9,7 @@ import pyotp
 import qrcode
 import io
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 import secrets
 import re
@@ -19,7 +19,7 @@ from flask_limiter.util import get_remote_address
 # Import database models and email service
 from api.app.database import db, User, Session as DBSession, OTPCode, WatchlistItem
 from api.app.services.email_service import email_service
-from api.app.extensions import limiter, bcrypt
+from api.app.extensions import limiter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,8 @@ def create_access_token(email):
     """Create JWT access token."""
     payload = {
         'email': email,
-        'exp': datetime.utcnow() + ACCESS_TOKEN_EXPIRY,
-        'iat': datetime.utcnow(),
+        'exp': datetime.now(timezone.utc) + ACCESS_TOKEN_EXPIRY,
+        'iat': datetime.now(timezone.utc),
         'type': 'access'
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
@@ -68,8 +68,8 @@ def create_refresh_token(email):
     """Create JWT refresh token."""
     payload = {
         'email': email,
-        'exp': datetime.utcnow() + REFRESH_TOKEN_EXPIRY,
-        'iat': datetime.utcnow(),
+        'exp': datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRY,
+        'iat': datetime.now(timezone.utc),
         'type': 'refresh'
     }
     return jwt.encode(payload, REFRESH_SECRET_KEY, algorithm='HS256')
@@ -173,7 +173,7 @@ def register():
         otp = OTPCode(
             user_id=new_user.id,
             code=otp_code,
-            expires_at=datetime.utcnow() + OTP_EXPIRY
+            expires_at=datetime.now(timezone.utc) + OTP_EXPIRY
         )
         db.session.add(otp)
         db.session.commit()
@@ -265,7 +265,7 @@ def resend_otp():
         otp = OTPCode(
             user_id=user.id,
             code=otp_code,
-            expires_at=datetime.utcnow() + OTP_EXPIRY
+            expires_at=datetime.now(timezone.utc) + OTP_EXPIRY
         )
         db.session.add(otp)
         db.session.commit()
@@ -342,12 +342,12 @@ def login():
             user_id=user.id,
             ip_address=get_remote_address(),
             user_agent=request.headers.get('User-Agent', '')[:500],
-            expires_at=datetime.utcnow() + REFRESH_TOKEN_EXPIRY
+            expires_at=datetime.now(timezone.utc) + REFRESH_TOKEN_EXPIRY
         )
         db.session.add(new_session)
         
         # Update last login
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.session.commit()
         
         response = make_response(jsonify({
@@ -416,5 +416,6 @@ def refresh_access_token():
 # Initialize extensions correctly from shared instances
 def init_auth(app):
     """Initialize authentication module with Flask app."""
-    # Bcrypt and Limiter are already initialized in main.py via init_app
+    # Limiter is already initialized in main.py via init_app
+    # Password hashing uses the bcrypt library directly via services/password_service.py
     app.register_blueprint(auth_bp, url_prefix='/api/auth')

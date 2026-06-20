@@ -15,6 +15,7 @@ env/
 
 # Data files (LARGE)
 Gold Dataset/
+Silver Dataset/
 *.csv
 
 # Logs
@@ -27,6 +28,11 @@ Gold Dataset/
 # IDE
 .vscode/
 .idea/
+
+# Database files (NEVER commit)
+*.db
+instance/
+api/instance/
 
 # Environment secrets — NEVER commit these
 .env

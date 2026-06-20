@@ -8,11 +8,15 @@ import time
 import logging
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import OperationalError
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
 db = SQLAlchemy()
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 
 
 class User(db.Model):
@@ -21,6 +25,7 @@ class User(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(255), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     
     # Verification
@@ -36,8 +41,8 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
     
     # Relationships
@@ -54,6 +59,7 @@ class User(db.Model):
         return {
             'id': self.id,
             'email': self.email,
+            'name': self.name,
             'is_verified': self.is_verified,
             'totp_enabled': self.totp_enabled,
             'is_active': self.is_active,
@@ -75,8 +81,8 @@ class Session(db.Model):
     user_agent = db.Column(db.String(500), nullable=True)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_active = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    last_active = db.Column(db.DateTime, default=_utcnow, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=True)
     
     def __repr__(self):
@@ -101,7 +107,7 @@ class OTPCode(db.Model):
     code = db.Column(db.String(6), nullable=False)
     
     # Expiry
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     is_used = db.Column(db.Boolean, default=False, nullable=False)
     
@@ -110,7 +116,7 @@ class OTPCode(db.Model):
     
     def is_valid(self):
         """Check if OTP is still valid."""
-        return not self.is_used and datetime.utcnow() < self.expires_at
+        return not self.is_used and datetime.now(timezone.utc) < self.expires_at
 
 
 class WatchlistItem(db.Model):
@@ -133,8 +139,8 @@ class WatchlistItem(db.Model):
     order = db.Column(db.Integer, default=0, nullable=False)  # For drag-drop ordering
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
     
     # Composite unique constraint
     __table_args__ = (
@@ -177,7 +183,7 @@ class UserSettings(db.Model):
     avatar_url = db.Column(db.String(512), nullable=True)
 
     # Timestamps
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow, nullable=False)
 
     def __repr__(self):
         return f'<UserSettings for user {self.user_id}>'
@@ -202,7 +208,7 @@ class RateLimitLog(db.Model):
     endpoint = db.Column(db.String(255), nullable=False)
     
     # Timestamp
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
     
     def __repr__(self):
         return f'<RateLimitLog {self.ip_address} - {self.endpoint}>'

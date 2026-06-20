@@ -1,10 +1,10 @@
-﻿'use client'
+'use client'
 
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Menu, Home, ListChecks, ShieldAlert, User, X, BarChart3 } from 'lucide-react'
+import { Menu, Home, ShieldAlert, User, X, BarChart3, Activity } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
@@ -16,9 +16,9 @@ export default function Sidebar() {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
-    { href: isAuthenticated ? '/dashboard/watchlist' : '/auth/login', label: 'Watchlist', icon: ListChecks },
     { href: isAuthenticated ? '/backtest' : '/auth/login', label: 'Backtest', icon: BarChart3 },
     { href: '/dashboard/risk', label: 'Risk', icon: ShieldAlert },
+    { href: isAuthenticated ? '/dashboard/pipeline' : '/auth/login', label: 'Pipeline', icon: Activity },
     { href: isAuthenticated ? '/dashboard/profile' : '/auth/login', label: 'Profile', icon: User },
   ]
 
@@ -58,7 +58,7 @@ export default function Sidebar() {
                 href={href}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-                  pathname === href || pathname.startsWith(href + '/')
+                  pathname === href
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                 )}
@@ -94,7 +94,7 @@ export default function Sidebar() {
               href={href}
               className={cn(
                 "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
-                pathname === href || pathname.startsWith(href + '/')
+                pathname === href
                   ? "bg-slate-800/60 text-white"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
               )}

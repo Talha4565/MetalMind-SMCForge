@@ -1,40 +1,95 @@
-﻿'use client';
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRunBacktest, useBacktestHistory } from '@/lib/hooks/useBacktest';
 import DashboardLayout from '@/components/Common/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { Play, History, Download, Trash2, Loader2 } from 'lucide-react';
+import { Play, History, Download, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { AssetType } from '@/lib/api-types';
+import { apiClient } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+
+const PROGRESS_STEPS = [
+  { at: 10, label: 'Initializing...' },
+  { at: 30, label: 'Loading data...' },
+  { at: 50, label: 'Running simulation...' },
+  { at: 70, label: 'Computing metrics...' },
+  { at: 80, label: 'Generating results...' },
+  { at: 100, label: 'Complete!' },
+];
 
 export default function BacktestPage() {
   const [asset, setAsset] = useState<AssetType>('gold');
   const [startDate, setStartDate] = useState('2026-01-01');
   const [endDate, setEndDate] = useState('2026-05-01');
-  
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState('');
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+  const [backtestDone, setBacktestDone] = useState(false);
+
   const runBacktest = useRunBacktest();
   const { data: history, isLoading: historyLoading } = useBacktestHistory();
 
+  const pollStatus = useCallback(async () => {
+    try {
+      const status = await apiClient.getBacktestStatus();
+      setProgress(status.progress);
+      setBacktestError(status.error);
+
+      const step = [...PROGRESS_STEPS].reverse().find(s => status.progress >= s.at);
+      setProgressLabel(step?.label || '');
+
+      if (!status.running && status.progress === 100) {
+        setBacktestDone(true);
+        setProgressLabel('Complete!');
+        return false;
+      }
+      if (!status.running && status.error) {
+        setProgressLabel('Failed');
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!runBacktest.isPending && progress === 0 && !backtestDone && !backtestError) return;
+
+    const interval = setInterval(async () => {
+      const shouldContinue = await pollStatus();
+      if (!shouldContinue) clearInterval(interval);
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [runBacktest.isPending, progress, backtestDone, backtestError, pollStatus]);
+
   const handleRun = async (e: React.FormEvent) => {
     e.preventDefault();
+    setBacktestError(null);
+    setBacktestDone(false);
+    setProgress(0);
+    setProgressLabel('Starting...');
+
     try {
       await runBacktest.mutateAsync({
         asset,
@@ -72,9 +127,7 @@ export default function BacktestPage() {
                   <Select
                     value={asset}
                     onValueChange={(value) => {
-                      if (value) {
-                        setAsset(value as AssetType);
-                      }
+                      if (value) setAsset(value as AssetType);
                     }}
                   >
                     <SelectTrigger className="bg-input/30 border-border">
@@ -90,42 +143,74 @@ export default function BacktestPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Start Date</Label>
-                    <Input 
-                      type="date" 
-                      value={startDate} 
+                    <Input
+                      type="date"
+                      value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-input/30 border-border" 
+                      className="bg-input/30 border-border"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">End Date</Label>
-                    <Input 
-                      type="date" 
-                      value={endDate} 
+                    <Input
+                      type="date"
+                      value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-input/30 border-border" 
+                      className="bg-input/30 border-border"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capital ($)</Label>
-                  <Input 
-                    type="number" 
-                    defaultValue={10000} 
-                    className="bg-input/30 border-border" 
+                  <Input
+                    type="number"
+                    defaultValue={10000}
+                    className="bg-input/30 border-border"
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
+                {/* Progress Bar */}
+                {(runBacktest.isPending || progress > 0) && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-400">{progressLabel}</span>
+                      <span className="text-slate-400 font-mono">{progress}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          backtestError ? "bg-red-500" : backtestDone ? "bg-green-500" : "bg-blue-500"
+                        )}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    {backtestError && (
+                      <p className="text-xs text-red-400 mt-1">{backtestError}</p>
+                    )}
+                    {backtestDone && (
+                      <p className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Backtest completed successfully!
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-6 rounded-xl transition-all shadow-lg shadow-blue-600/20"
-                  disabled={runBacktest.isPending}
+                  disabled={runBacktest.isPending || (progress > 0 && progress < 100)}
                 >
-                  {runBacktest.isPending ? (
+                  {runBacktest.isPending || (progress > 0 && progress < 100) ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Simulating...
+                    </>
+                  ) : backtestDone ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Run Again
                     </>
                   ) : (
                     <>

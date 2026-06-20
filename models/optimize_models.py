@@ -76,7 +76,7 @@ class ModelOptimizer:
         
     def optimize_hyperparameters(self, n_trials: int = 50):
         """Advanced hyperparameter optimization with Optuna."""
-        logger.info(f"\n🎯 Starting hyperparameter optimization ({n_trials} trials)...")
+        logger.info(f"\n Starting hyperparameter optimization ({n_trials} trials)...")
         
         def objective(trial):
             params = {
@@ -113,7 +113,7 @@ class ModelOptimizer:
         study = optuna.create_study(direction='maximize')
         study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
         
-        logger.info(f"\n✅ Best AUC: {study.best_value:.4f}")
+        logger.info(f"\n Best AUC: {study.best_value:.4f}")
         logger.info(f"Best parameters:")
         for key, value in study.best_params.items():
             logger.info(f"  {key}: {value}")
@@ -122,7 +122,7 @@ class ModelOptimizer:
     
     def train_optimized_model(self, params: dict):
         """Train model with optimized parameters."""
-        logger.info("\n🚀 Training optimized model...")
+        logger.info("\n Training optimized model...")
         
         import xgboost as xgb
         
@@ -139,11 +139,11 @@ class ModelOptimizer:
             verbose=False
         )
         
-        logger.info("✅ Model trained successfully")
+        logger.info("Model trained successfully")
     
     def optimize_threshold(self):
         """Find optimal probability threshold for predictions."""
-        logger.info("\n🎯 Optimizing prediction threshold...")
+        logger.info("\n Optimizing prediction threshold...")
         
         y_pred_proba = self.model.predict_proba(self.X_val)[:, 1]
         
@@ -164,12 +164,12 @@ class ModelOptimizer:
                     best_profit_factor = profit_factor
                     best_threshold = threshold
         
-        logger.info(f"✅ Best threshold: {best_threshold:.2f} (Profit Factor: {best_profit_factor:.2f})")
+        logger.info(f" Best threshold: {best_threshold:.2f} (Profit Factor: {best_profit_factor:.2f})")
         return best_threshold
     
     def evaluate(self, threshold: float = 0.5):
         """Evaluate model on test set."""
-        logger.info("\n📊 Evaluating on test set...")
+        logger.info("\n Evaluating on test set...")
         
         y_pred_proba = self.model.predict_proba(self.X_test)[:, 1]
         y_pred = (y_pred_proba >= threshold).astype(int)
@@ -202,13 +202,13 @@ class ModelOptimizer:
         with open(output_file, 'wb') as f:
             pickle.dump(model_data, f)
         
-        logger.info(f"\n✅ Optimized model saved to: {output_file}")
+        logger.info(f"\n Optimized model saved to: {output_file}")
 
 
 def optimize_asset(asset: str, n_trials: int = 50):
     """Run full optimization pipeline for an asset."""
     logger.info("="*60)
-    logger.info(f"{'🥇 GOLD' if asset == 'gold' else '🥈 SILVER'} MODEL OPTIMIZATION")
+    logger.info(f"{' GOLD' if asset == 'gold' else ' SILVER'} MODEL OPTIMIZATION")
     logger.info("="*60)
     
     optimizer = ModelOptimizer(asset=asset)
@@ -232,7 +232,7 @@ def optimize_asset(asset: str, n_trials: int = 50):
     optimizer.save_optimized_model(threshold=best_threshold)
     
     logger.info("\n" + "="*60)
-    logger.info(f"{'🥇 GOLD' if asset == 'gold' else '🥈 SILVER'} OPTIMIZATION COMPLETE!")
+    logger.info(f"{' GOLD' if asset == 'gold' else ' SILVER'} OPTIMIZATION COMPLETE!")
     logger.info("="*60)
 
 

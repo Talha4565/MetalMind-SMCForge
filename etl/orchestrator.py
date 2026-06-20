@@ -221,22 +221,10 @@ class HealthMonitor:
             from etl.alerts import EmailAlertService
             alerts = EmailAlertService()
             if alerts.enabled:
-                # Send as a special alert (not a trading signal)
-                import smtplib
-                import ssl
-                from email.mime.text import MIMEText
-                
-                msg = MIMEText(f"MetalMind Pipeline Health Alert\n\n{message}\n\nTime: {datetime.now().isoformat()}")
-                msg['Subject'] = f"🚨 Pipeline Alert: {message[:50]}"
-                msg['From'] = alerts.sender_email
-                msg['To'] = alerts.recipient_email
-                
-                context = ssl.create_default_context()
-                with smtplib.SMTP(alerts.smtp_host, alerts.smtp_port) as server:
-                    server.starttls(context=context)
-                    server.login(alerts.sender_email, alerts.sender_password)
-                    server.sendmail(alerts.sender_email, alerts.recipient_email, msg.as_string())
-                
+                alerts.send_raw_email(
+                    subject=f"Pipeline Alert: {message[:50]}",
+                    body=f"MetalMind Pipeline Health Alert\n\n{message}\n\nTime: {datetime.now().isoformat()}"
+                )
                 logger.info("Health alert email sent")
         except Exception as e:
             logger.warning(f"Could not send health alert email: {e}")

@@ -1,0 +1,10 @@
+{
+  "last_update": "2026-06-16T17:35:49.456802",
+  "last_retrain": "2026-06-16T17:35:49.457893",
+  "update_status": "success",
+  "retrain_status": "success",
+  "update_error": null,
+  "retrain_error": null,
+  "consecutive_failures": 0,
+  "uptime_since": "2026-06-16T17:35:47.816560"
+}

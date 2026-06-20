@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import DashboardLayout from '@/components/Common/DashboardLayout';
@@ -64,7 +64,7 @@ export default function ProfilePage() {
   const onProfileSubmit = async (data: ProfileValues) => {
     setIsSaving(true);
     try {
-      await apiClient.updateProfile({ email: data.email });
+      await apiClient.updateProfile({ name: data.name, email: data.email });
       toast.success('Profile updated successfully!');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'An error occurred';

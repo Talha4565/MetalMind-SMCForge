@@ -1,0 +1,98 @@
+﻿# Chapter 3: System Analysis
+## 3.1  Problem Overview
+## 3.2  Requirement Analysis
+## 3.4  Non-Functional Requirements
+## 3.5  Use Case Diagram
+## 3.6  Fully Dressed Use Cases
+### 3.6.1  UC-01: Register Account
+### 3.6.2  UC-02: Login to System
+### 3.6.3  UC-03: Generate ML Forecast
+### 3.6.4  UC-04: View SHAP Explanation
+### 3.6.5  UC-05: View Candlestick Chart with Signals
+### 3.6.6  UC-06: Configure and Run Backtest
+### 3.6.7  UC-07: Manage Watchlist
+### 3.6.8  UC-08: Export Report
+### 3.6.9  UC-09: Manage Users (Admin)
+### 3.6.10  UC-10: Logout
+## 3.7  Domain Model
+# Chapter 4: System Design
+## 4.1  Introduction
+## 4.2  System Architecture
+## 4.3  Class Diagram (Mandatory)
+## 4.4  Interaction Diagram  Sequence Diagram (Mandatory)
+## 4.5  Entity-Relationship Diagram with 3NF Normalization (Mandatory)
+### 4.5.1  Database Normalization to 3NF
+## 4.6  Activity Diagram (Optional)
+## 4.7  Component Diagram (Optional)
+## 4.8  Deployment Diagram (Optional)
+## 4.9  Package Diagram (Optional)
+## 4.10  User Interface Design
+## 4.11  Security Design
+## 4.12  Chapter Summary
+# Chapter 5: Implementation
+## 5.1  Tools for Implementation
+## 5.2  Modules Translated in Implementation
+### 5.2.1  Authentication Module
+### 5.2.2  Feature Engineering Module
+### 5.2.3  ML Inference Module
+### 5.2.4  SHAP Explainability Module
+### 5.2.5  Backtesting Engine Module
+### 5.2.6  Frontend Dashboard Module
+### 5.2.7  Database Module
+## 5.3  Component Diagram  Implementation View
+## 5.4  Package Diagram  Implementation View
+## 5.5  Deployment Diagram  Physical Realization
+## 5.6  Implementation Challenges and Resolutions
+# Chapter 6: Testing
+## 6.1  Introduction
+## 6.2  Testing Methods Used
+### 6.2.1  Unit Testing
+### 6.2.2  Integration Testing
+### 6.2.3  System Testing
+### 6.2.4  Black Box Testing
+### 6.2.5  Performance Testing
+### 6.2.6  User Acceptance Testing
+## 6.3  Test Cases
+### Test Case TC-001: User Registration
+### Test Case TC-002: User Login with Valid Credentials
+### Test Case TC-003: Login with Invalid Password
+### Test Case TC-004: Gold ML Forecast Generation
+### Test Case TC-005: Silver ML Forecast Generation
+### Test Case TC-006: Unauthenticated Forecast Attempt
+### Test Case TC-007: Candlestick Chart Data Retrieval
+### Test Case TC-008: Backtesting Execution and Metrics
+### Test Case TC-009: SHAP Waterfall Plot Rendering
+### Test Case TC-010: Watchlist Add and Persistence
+### Test Case TC-011: PDF Report Export
+### Test Case TC-012: Invalid Date Range Validation
+### Test Case TC-013: JWT Tampering Security Test
+### Test Case TC-014: Admin User Role Modification
+## 6.4  Test Results Summary
+## 6.5  Performance Test Results
+## 6.6  ML Model Evaluation Results
+### 6.6.1  Classification Metrics ù Test Set 2021û2024
+### 6.6.2  Ablation Study ù SMC Feature Contribution
+## 6.7  User Acceptance Testing Results
+## 6.8  Defects Identified and Resolved
+# Chapter 7: Conclusion and Future Work
+## 7.1  Overall Conclusion of Report
+## 7.2  Achievements Against Objectives
+## 7.3  Limitations
+## 7.4  Future Work
+## 7.5  Final Remarks
+# Bibliography and References
+# Appendix A: System Screenshots
+## A.1  Authentication Screen (Figure A.1)
+## A.2  Main Dashboard with Candlestick Chart (Figure A.2)
+## A.3  Forecast Result Panel (Figure A.3)
+## A.4  SHAP Waterfall Explanation Chart (Figure A.4)
+## A.5  Backtesting Results Dashboard (Figure A.5)
+## A.6  Report Export Interface (Figure A.6)
+# Appendix B: API Documentation
+# Appendix C: Database Schema SQL
+# Appendix D: XGBoost Model Hyperparameters
+# Appendix E: Feature Engineering Code
+## E.1  Fair Value Gap Detection
+## E.2  Liquidity Sweep Detection
+## E.3  Break of Structure Detection
+## E.4  Order Block Detection

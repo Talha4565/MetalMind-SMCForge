@@ -18,7 +18,7 @@ export default function Footer() {
             <Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link>
             <Link href="/backtest" className="hover:text-foreground transition-colors">Backtest</Link>
             <Link href="/dashboard/profile" className="hover:text-foreground transition-colors">Profile</Link>
-            <a href="https://github.com/Talha/ml-signals" className="hover:text-foreground transition-colors">GitHub</a>
+            <a href="https://github.com/Talha4565/MetalMind-SMCForge" className="hover:text-foreground transition-colors">GitHub</a>
           </div>
 
           <div className="flex items-center gap-1.5">

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-06-18T16:00:00.000Z" agent="MiMoCode" version="21.0.0">
+  <diagram id="pipeline-arch" name="Pipeline Architecture">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Title -->
+        <mxCell id="title" value="MetalMind SMCForge — Pipeline Architecture" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;fontColor=#1a365d;" vertex="1" parent="1">
+          <mxGeometry x="250" y="20" width="600" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Yahoo Finance -->
+        <mxCell id="yahoo" value="Yahoo Finance&#xa;GC=F / SI=F" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cdn-icons-png.flaticon.com/512/5968/5968672.png;fillColor=#fff;strokeColor=#666666;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="120" width="80" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ETL Pipeline -->
+        <mxCell id="etl" value="ETL Pipeline&#xa;Extract → Transform → Load" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontColor=#1e40af;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="110" width="200" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- CSV Files -->
+        <mxCell id="csv" value="CSV Files&#xa;Gold Dataset/&#xa;Silver Dataset/" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fef3c7;strokeColor=#f59e0b;fontColor=#92400e;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="115" width="120" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- Feature Pipeline -->
+        <mxCell id="features" value="Feature Engineering&#xa;89 Features (SMC + Volume + MTF)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontColor=#166534;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="280" width="200" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- XGBoost Model -->
+        <mxCell id="model" value="XGBoost Model&#xa;Gold + Silver" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;fontColor=#5b21b6;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="280" width="120" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Predictions -->
+        <mxCell id="predictions" value="Predictions&#xa;BUY / SELL / HOLD&#xa;+ SHAP Explainability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce7f3;strokeColor=#ec4899;fontColor=#9d174d;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="660" y="280" width="160" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Dashboard -->
+        <mxCell id="dashboard" value="Dashboard&#xa;Next.js Frontend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0e2e8;strokeColor=#64748b;fontColor=#1e293b;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="660" y="120" width="160" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- GitHub Actions -->
+        <mxCell id="github" value="GitHub Actions&#xa;Auto: 15min + Daily 3AM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#94a3b8;fontColor=#334155;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="300" width="120" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Connectors -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3b82f6;strokeWidth=2;" edge="1" source="yahoo" target="etl" parent="1"/>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#3b82f6;strokeWidth=2;" edge="1" source="etl" target="csv" parent="1"/>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#22c55e;strokeWidth=2;" edge="1" source="csv" target="features" parent="1"/>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#8b5cf6;strokeWidth=2;" edge="1" source="features" target="model" parent="1"/>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#ec4899;strokeWidth=2;" edge="1" source="model" target="predictions" parent="1"/>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#64748b;strokeWidth=2;" edge="1" source="predictions" target="dashboard" parent="1"/>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" edge="1" source="github" target="etl" parent="1"/>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#94a3b8;strokeWidth=2;dashed=1;" edge="1" source="github" target="model" parent="1"/>
+
+        <!-- Labels -->
+        <mxCell id="l1" value="Fetch OHLCV" style="text;html=1;fontSize=9;fontColor=#64748b;align=center;" vertex="1" parent="1">
+          <mxGeometry x="110" y="95" width="80" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="l2" value="Append to CSV" style="text;html=1;fontSize=9;fontColor=#64748b;align=center;" vertex="1" parent="1">
+          <mxGeometry x="390" y="95" width="80" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="l3" value="Engineer 89 features" style="text;html=1;fontSize=9;fontColor=#64748b;align=center;" vertex="1" parent="1">
+          <mxGeometry x="390" y="260" width="120" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="l4" value="Train + Predict" style="text;html=1;fontSize=9;fontColor=#64748b;align=center;" vertex="1" parent="1">
+          <mxGeometry x="590" y="260" width="80" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

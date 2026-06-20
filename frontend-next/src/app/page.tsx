@@ -1,4 +1,4 @@
-﻿import Link from 'next/link';
+import Link from 'next/link';
 import { ArrowRight, Zap } from 'lucide-react';
 
 export default function Home() {
@@ -51,7 +51,7 @@ export default function Home() {
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
           <Link
-            href="https://github.com/Talha/ml-signals"
+            href="https://github.com/Talha4565/MetalMind-SMCForge"
             className="px-8 py-4 bg-transparent hover:bg-accent/50 border border-border text-muted-foreground font-bold rounded-xl transition-all flex items-center justify-center"
           >
             View source

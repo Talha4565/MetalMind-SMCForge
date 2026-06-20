@@ -32,13 +32,8 @@ export default function Header() {
 
   return (
     <header className="h-14 border-b border-border bg-background/95 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-40">
-      {/* Left — brand */}
-      <Link href="/dashboard" className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-md bg-emerald-600 flex items-center justify-center">
-          <span className="text-white text-xs font-black">M</span>
-        </div>
-        <span className="text-sm font-bold text-foreground hidden sm:block">MetalMind</span>
-      </Link>
+      {/* Left — spacer (brand is in Sidebar) */}
+      <div />
 
       {/* Right */}
       <div className="flex items-center gap-3">

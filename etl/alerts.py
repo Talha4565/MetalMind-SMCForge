@@ -160,3 +160,26 @@ class EmailAlertService:
         except Exception as e:
             logger.error(f"✗ Failed to send email alert: {e}")
             return False
+    
+    def send_raw_email(self, subject: str, body: str) -> bool:
+        """Send a raw email (for health alerts, system notifications, etc.)."""
+        if not self.enabled:
+            return False
+        
+        try:
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = self.sender_email
+            msg['To'] = self.recipient_email
+            
+            context = ssl.create_default_context()
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls(context=context)
+                server.login(self.sender_email, self.sender_password)
+                server.sendmail(self.sender_email, self.recipient_email, msg.as_string())
+            
+            logger.info(f"✓ Raw email sent: {subject}")
+            return True
+        except Exception as e:
+            logger.error(f"✗ Failed to send raw email: {e}")
+            return False

@@ -37,6 +37,8 @@ def generate_labels(df: pd.DataFrame,
     max_bars = max_bars or params['max_bars']
     
     close = df['close'].to_numpy()
+    high = df['high'].to_numpy()
+    low = df['low'].to_numpy()
     labels = np.zeros(len(close))
     
     for i in range(len(close) - max_bars):
@@ -46,20 +48,20 @@ def generate_labels(df: pd.DataFrame,
             if i + k >= len(close):
                 break
             
-            future_price = close[i + k]
-            ret = (future_price - entry_price) / entry_price
+            ret_high = (high[i + k] - entry_price) / entry_price
+            ret_low = (low[i + k] - entry_price) / entry_price
             
-            # Hit take profit → label = 1
-            if ret >= tp:
+            hit_tp = ret_high >= tp
+            hit_sl = ret_low <= -sl
+            
+            if hit_tp:
                 labels[i] = 1
                 break
             
-            # Hit stop loss → label = 0
-            if ret <= -sl:
+            if hit_sl:
                 labels[i] = 0
                 break
         else:
-            # Timeout without hitting either barrier → label = 0 (no trade)
             labels[i] = 0
     
     return pd.Series(labels, index=df.index, name='target')
