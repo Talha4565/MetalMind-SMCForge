@@ -77,6 +77,11 @@ class MockFailingLoader(BaseLoader):
 class TestETLPipelineIntegration:
     """Test full ETL pipeline flow."""
 
+    def _permissive_gate(self):
+        """Return a DataQualityGate that won't block small mock datasets."""
+        from etl.guards.data_quality_gate import DataQualityGate
+        return DataQualityGate(config={"min_rows_required": 0, "max_price_change_pct": 999})
+
     def test_successful_pipeline(self):
         extractor = MockExtractor()
         transformers = [MockTransformer('col_a'), MockTransformer('col_b')]
@@ -86,7 +91,8 @@ class TestETLPipelineIntegration:
             name='Test Pipeline',
             extractor=extractor,
             transformers=transformers,
-            loaders=loaders
+            loaders=loaders,
+            data_quality_gate=self._permissive_gate(),
         )
 
         result = pipeline.run()
@@ -103,7 +109,8 @@ class TestETLPipelineIntegration:
             name='Failing Pipeline',
             extractor=extractor,
             transformers=transformers,
-            loaders=loaders
+            loaders=loaders,
+            data_quality_gate=self._permissive_gate(),
         )
 
         result = pipeline.run()
@@ -119,7 +126,8 @@ class TestETLPipelineIntegration:
             name='Failing Load Pipeline',
             extractor=extractor,
             transformers=transformers,
-            loaders=loaders
+            loaders=loaders,
+            data_quality_gate=self._permissive_gate(),
         )
 
         result = pipeline.run()
@@ -131,7 +139,8 @@ class TestETLPipelineIntegration:
             name='Status Pipeline',
             extractor=extractor,
             transformers=[],
-            loaders=[MockLoader()]
+            loaders=[MockLoader()],
+            data_quality_gate=self._permissive_gate(),
         )
 
         status = pipeline.get_status()
@@ -149,7 +158,8 @@ class TestETLPipelineIntegration:
             name='Metrics Pipeline',
             extractor=extractor,
             transformers=[MockTransformer()],
-            loaders=[MockLoader()]
+            loaders=[MockLoader()],
+            data_quality_gate=self._permissive_gate(),
         )
 
         pipeline.run()
@@ -183,3 +193,28 @@ class TestETLPipelineIntegration:
         assert result.started_at is not None
         assert result.completed_at is not None
         assert result.completed_at >= result.started_at
+
+    def test_pipeline_skipped_by_data_quality_gate(self):
+        """When the gate says should_continue=False, the run returns SKIPPED early."""
+        from etl.guards.data_quality_gate import ValidationResult
+
+        class BlockingGate:
+            def validate(self, df, asset="gold"):
+                return ValidationResult(
+                    passed=False, rows_before=len(df), rows_after=5,
+                    issues=["too few rows"], should_continue=False, cleaned_df=df,
+                )
+
+        extractor = MockExtractor()
+        pipeline = ETLPipeline(
+            name="Skipped Pipeline",
+            extractor=extractor,
+            transformers=[MockTransformer()],
+            loaders=[MockLoader()],
+            data_quality_gate=BlockingGate(),
+        )
+        result = pipeline.run()
+        assert result.status == PipelineStatus.SKIPPED
+        # Transformers/loaders must NOT have run
+        assert "transform_1" not in result.stage_results
+        assert "data_quality_gate" in result.stage_results
