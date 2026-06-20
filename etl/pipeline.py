@@ -21,6 +21,7 @@ class PipelineStatus(Enum):
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"  # Some stages succeeded, some failed
+    SKIPPED = "skipped"  # Data-quality gate blocked the run
 
 
 @dataclass
@@ -44,7 +45,8 @@ class ETLPipeline:
         extractor: BaseExtractor,
         transformers: List[BaseTransformer],
         loaders: List[BaseLoader],
-        config: Dict[str, Any] = None
+        config: Dict[str, Any] = None,
+        data_quality_gate=None,
     ):
         """
         Initialize ETL Pipeline.
@@ -55,6 +57,7 @@ class ETLPipeline:
             transformers: List of transformer instances
             loaders: List of loader instances
             config: Optional configuration dictionary
+            data_quality_gate: Optional DataQualityGate instance (defaults to real one)
         """
         self.name = name
         self.extractor = extractor
@@ -63,6 +66,11 @@ class ETLPipeline:
         self.config = config or {}
         self.last_result: Optional[PipelineResult] = None
         self.run_count = 0
+        if data_quality_gate is not None:
+            self.data_quality_gate = data_quality_gate
+        else:
+            from .guards.data_quality_gate import DataQualityGate
+            self.data_quality_gate = DataQualityGate()
     
     def run(self) -> PipelineResult:
         """Execute the complete ETL pipeline."""
@@ -95,7 +103,36 @@ class ETLPipeline:
             
             logger.info(f"✓ Extraction complete: {len(data)} records")
             logger.info("")
-            
+
+            # ========== DATA QUALITY GATE ==========
+            logger.info("PHASE 1.5: DATA QUALITY GATE")
+            logger.info("-" * 80)
+            dq = self.data_quality_gate.validate(
+                data, asset=self.config.get("asset", "gold")
+            )
+            result.stage_results["data_quality_gate"] = {
+                "success": dq.passed,
+                "rows_before": dq.rows_before,
+                "rows_after": dq.rows_after,
+                "issues": dq.issues,
+                "should_continue": dq.should_continue,
+            }
+            logger.info(
+                f"  rows {dq.rows_before} -> {dq.rows_after}, "
+                f"continue={dq.should_continue}, issues={dq.issues}"
+            )
+            if not dq.should_continue:
+                result.status = PipelineStatus.SKIPPED
+                result.completed_at = datetime.now()
+                result.error = "Data-quality gate blocked the run"
+                logger.warning(
+                    f"⚠ Pipeline '{self.name}' SKIPPED by data-quality gate: {dq.issues}"
+                )
+                self.last_result = result
+                return result
+            data = dq.cleaned_df
+            logger.info("")
+
             # ========== TRANSFORM ==========
             logger.info("PHASE 2: TRANSFORM")
             logger.info("-" * 80)
