@@ -4,7 +4,7 @@ Allows users to add/remove assets to their personal watchlist.
 """
 
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 import logging
 
@@ -157,7 +157,7 @@ def update_watchlist_item(current_user, item_id):
     if 'order' in data:
         item.order = data['order']
     
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     
     # FIXED: Add transaction rollback on error
     try:

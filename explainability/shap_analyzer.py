@@ -40,7 +40,7 @@ class ShapAnalyzer:
         # Compute SHAP values
         self.shap_values = self.explainer.shap_values(X_sample)
         
-        logger.info("✅ SHAP values computed")
+        logger.info("SHAP values computed")
         return self.shap_values
     
     def plot_feature_importance(self, X: pd.DataFrame, top_n: int = None, save_path: Path = None):

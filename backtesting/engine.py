@@ -385,7 +385,6 @@ class BacktestEngine:
         print(f"Sharpe Ratio:       {metrics['sharpe_ratio']:.2f}")
         print(f"Sortino Ratio:      {metrics['sortino_ratio']:.2f}")
         print(f"Calmar Ratio:       {metrics['calmar_ratio']:.2f}")
-        print(f"Sharpe Ratio:       {metrics['sharpe_ratio']:.2f}")
         print("=" * 60)
 
 

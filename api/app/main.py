@@ -41,7 +41,7 @@ from data.loaders import load_gold_data, load_silver_data, load_asset_data
 from features.pipeline import engineer_all_features
 
 # Import extensions, database and authentication
-from api.app.extensions import limiter, bcrypt, migrate
+from api.app.extensions import limiter, migrate
 from api.app.database import init_database, db
 from api.app.auth import init_auth, token_required
 from api.app.watchlist import watchlist_bp

@@ -4,7 +4,7 @@ Allows users to view and update their profile information.
 """
 
 from flask import Blueprint, request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pyotp
 import qrcode
 import io
@@ -75,6 +75,13 @@ def update_profile(current_user):
     if not data:
         return jsonify({'error': 'No data provided'}), 400
     
+    # Update name if provided
+    if 'name' in data:
+        new_name = data['name'].strip()
+        if len(new_name) < 2:
+            return jsonify({'error': 'Name must be at least 2 characters'}), 400
+        current_user.name = new_name
+    
     # Update email if provided
     if 'email' in data:
         new_email = data['email'].strip().lower()
@@ -100,12 +107,12 @@ def update_profile(current_user):
             otp = OTPCode(
                 user_id=current_user.id,
                 code=otp_code,
-                expires_at=datetime.utcnow() + timedelta(minutes=10)
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
             )
             db.session.add(otp)
             email_service.send_otp(new_email, otp_code)
     
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     
     # FIXED: Add transaction rollback on error
     try:
@@ -155,7 +162,7 @@ def change_password(current_user):
     
     # Update password
     current_user.password_hash = password_service.hash_password(new_password)
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     
     # FIXED: Add transaction rollback on error
     try:
@@ -375,7 +382,7 @@ def delete_account(current_user):
     
     # Soft delete - mark as inactive
     current_user.is_active = False
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     
     # FIXED: Add transaction rollback on error
     try:

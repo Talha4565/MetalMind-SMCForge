@@ -1,0 +1,124 @@
+{
+  "summary": {
+    "total": 23,
+    "passed": 0,
+    "failed": 23
+  },
+  "tests": [
+    {
+      "test": "Health check",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Live price gold",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Live price silver",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Invalid asset validation",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "GOLD predictions",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "SILVER predictions",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Invalid asset prediction",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Limit validation",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "SHAP endpoint",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Model info",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Landing page (/)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Login page (/auth/login)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Register page (/auth/register)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Dashboard (/dashboard)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Risk calculator (/dashboard/risk)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Profile page (/dashboard/profile)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Watchlist page (/dashboard/watchlist)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Backtest page (/backtest)",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Rate limiting",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Security headers",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Socket.IO polling",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Register endpoint",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    },
+    {
+      "test": "Login endpoint",
+      "passed": false,
+      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+    }
+  ]
+}

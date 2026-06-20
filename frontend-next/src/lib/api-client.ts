@@ -235,13 +235,34 @@ class ApiClient {
     return response.data;
   }
 
+  async getBacktestStatus(): Promise<{ running: boolean; progress: number; error: string | null; result: unknown }> {
+    const response = await this.client.get('/api/backtest/status');
+    return response.data;
+  }
+
   async getBacktestResults(): Promise<BacktestResponse[]> {
     const response = await this.client.get<BacktestResponse[]>('/api/backtest/results');
     return response.data;
   }
 
+  // Pipeline
+  async getPipelineStatus(): Promise<any> {
+    const response = await this.client.get('/api/pipeline/status');
+    return response.data;
+  }
+
+  async getPipelineDetails(): Promise<any> {
+    const response = await this.client.get('/api/pipeline/details');
+    return response.data;
+  }
+
+  async triggerPipeline(type: string, asset: string): Promise<any> {
+    const response = await this.client.post('/api/pipeline/run', { type, asset });
+    return response.data;
+  }
+
   // Profile
-  async updateProfile(data: { email?: string }): Promise<{ message: string; profile: Profile }> {
+  async updateProfile(data: { name?: string; email?: string }): Promise<{ message: string; profile: Profile }> {
     const response = await this.client.put<{ message: string; profile: Profile }>('/api/profile', data);
     return response.data;
   }

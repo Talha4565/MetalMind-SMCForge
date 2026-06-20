@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-06-20T11:39:31.795614",
+  "project": "C:\\Users\\Talha\\ml-signals",
+  "total_files": 27576,
+  "findings": [
+    {
+      "severity": "Critical",
+      "title": "Possible hardcoded secret",
+      "detail": "frontend-next\\tsconfig.tsbuildinfo:1: {\"fileNames\":[\"./node_modules/typescript/lib/lib.es5.d.ts\",\"./node_modules/typescript/lib/lib.es2015.d.ts\",\"./node_modul",
+      "remediation": "Move to environment variables or a secrets manager"
+    },
+    {
+      "severity": "Nice-to-have",
+      "title": "TODO/FIXME found",
+      "detail": "run_etl.py:180: # TODO: Implement status check"
+    },
+    {
+      "severity": "Nice-to-have",
+      "title": "TODO/FIXME found",
+      "detail": "miscellaneous_archive\\planning-docs\\FYP_PROGRESS_REPORT.md:232: - [ ] **09:00-10:00**: Code cleanup (remove TODO comments, unused imports)"
+    }
+  ],
+  "exit_code": 1,
+  "new_critical_titles": [
+    "Possible hardcoded secret"
+  ]
+}
