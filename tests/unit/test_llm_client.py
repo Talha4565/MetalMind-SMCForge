@@ -17,40 +17,51 @@ class TestNemotronClient:
             assert c.is_available() is False
             assert c.chat([{"role": "user", "content": "hi"}]) is None
 
-    @patch("etl.agents.llm_client.requests.post")
-    def test_chat_returns_content_on_success(self, mock_post):
-        mock_post.return_value = MagicMock(
-            status_code=200,
-            json=lambda: {"choices": [{"message": {"content": '{"approved": true}'}}]},
-        )
-        c = NemotronClient(api_key="fake-key")
-        out = c.chat([{"role": "user", "content": "decide"}])
-        assert out == '{"approved": true}'
-        # Confirm the real model ID is used (not the fictional "nemotron-3-super")
-        _, kwargs = mock_post.call_args
-        assert kwargs["json"]["model"] == "nvidia/nemotron-3-ultra-550b-a55b"
+    def test_chat_returns_content_on_success(self):
+        mock_msg = MagicMock()
+        mock_msg.content = '{"approved": true}'
+        mock_choice = MagicMock()
+        mock_choice.message = mock_msg
+        mock_completion = MagicMock()
+        mock_completion.choices = [mock_choice]
 
-    @patch("etl.agents.llm_client.requests.post")
-    def test_chat_returns_none_on_http_error(self, mock_post):
-        mock_post.return_value = MagicMock(status_code=500, json=lambda: {})
-        c = NemotronClient(api_key="fake-key")
-        assert c.chat([{"role": "user", "content": "decide"}]) is None
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "fake-key"}, clear=False):
+            c = NemotronClient()
+            c._client = MagicMock()
+            c._client.chat.completions.create.return_value = mock_completion
 
-    @patch("etl.agents.llm_client.requests.post")
-    def test_chat_returns_none_on_timeout(self, mock_post):
-        import requests as req
-        mock_post.side_effect = req.Timeout("timed out")
-        c = NemotronClient(api_key="fake-key")
-        assert c.chat([{"role": "user", "content": "decide"}]) is None
+            out = c.chat([{"role": "user", "content": "decide"}])
+            assert out == '{"approved": true}'
+            _, kwargs = c._client.chat.completions.create.call_args
+            assert kwargs["model"] == "nvidia/nemotron-3-ultra-550b-a55b"
 
-    @patch("etl.agents.llm_client.requests.post")
-    def test_chat_returns_none_on_malformed_json(self, mock_post):
-        mock_post.return_value = MagicMock(
-            status_code=200, json=lambda: {"not_choices": []}
-        )
-        c = NemotronClient(api_key="fake-key")
-        assert c.chat([{"role": "user", "content": "decide"}]) is None
+    def test_chat_returns_none_on_api_error(self):
+        from openai import APIStatusError
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "fake-key"}, clear=False):
+            c = NemotronClient()
+            c._client = MagicMock()
+            c._client.chat.completions.create.side_effect = APIStatusError(
+                message="error", response=MagicMock(status_code=500), body=None
+            )
+            assert c.chat([{"role": "user", "content": "decide"}]) is None
+
+    def test_chat_returns_none_on_timeout(self):
+        from openai import APITimeoutError
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "fake-key"}, clear=False):
+            c = NemotronClient()
+            c._client = MagicMock()
+            c._client.chat.completions.create.side_effect = APITimeoutError(request=MagicMock())
+            assert c.chat([{"role": "user", "content": "decide"}]) is None
+
+    def test_chat_returns_none_on_connection_error(self):
+        from openai import APIConnectionError
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "fake-key"}, clear=False):
+            c = NemotronClient()
+            c._client = MagicMock()
+            c._client.chat.completions.create.side_effect = APIConnectionError(request=MagicMock())
+            assert c.chat([{"role": "user", "content": "decide"}]) is None
 
     def test_does_not_use_fictional_super_model(self):
-        c = NemotronClient(api_key="fake-key")
-        assert "nemotron-3-super" not in c.model, "use a real model ID from build.nvidia.com"
+        with patch.dict(os.environ, {"NVIDIA_API_KEY": "fake-key"}, clear=False):
+            c = NemotronClient()
+            assert "nemotron-3-super" not in c.model, "use a real model ID from build.nvidia.com"
