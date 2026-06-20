@@ -45,7 +45,7 @@ The committed databases contain **9 real user rows** with bcrypt password hashes
 
 **Severity:** CRITICAL  
 **Location:** `.env` (line 20)  
-**Evidence:** `RESEND_API_KEY=re_hKr1Cdpi_Q3d8V89WPoidSQXB2rxvULKj`
+**Evidence:** `RESEND_API_KEY=re_<redacted>`
 
 The `.env` itself is correctly gitignored and NOT tracked. However:
 - The key is a **real, active API key** sitting on disk with no encryption
