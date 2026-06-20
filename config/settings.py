@@ -229,3 +229,44 @@ def get_session_times():
 def get_xgboost_params():
     """Get XGBoost hyperparameters."""
     return BASELINE_CONFIG["xgboost_params"]
+
+# ============================================================================
+# DATA QUALITY GATE (etl/guards/data_quality_gate.py)
+# Extends DataQualityTransformer — only the gaps it doesn't cover.
+# ============================================================================
+DATA_QUALITY_GATE_CONFIG = {
+    "max_price_change_pct": 0.10,      # Drop candle if |close-prev_close|/prev_close > 10%
+    "min_rows_required": 50,           # Skip run entirely if fewer rows survive
+    "enabled": True,
+}
+
+# ============================================================================
+# ALERT RISK GATE (etl/guards/alert_risk_gate.py)
+# Deterministic gate run at the live alert call site (api/app/main.py:688).
+# ============================================================================
+ALERT_RISK_GATE_CONFIG = {
+    "enabled": True,
+    "min_alert_interval_min": 30,       # Cooldown per asset — biggest ROI
+    "suppress_weekends": True,
+    "session_start_utc": "07:00",       # London open (UTC)
+    "session_end_utc": "21:00",         # NY close (UTC)
+    "enforce_session": False,           # Off by default — opt-in
+    "max_atr_multiplier": 2.0,          # ATR > 2x 20-bar avg => suppress
+    "enforce_volatility": False,        # Off by default — see AD7
+}
+
+# ============================================================================
+# SIGNAL REASONER AGENT (etl/agents/signal_reasoner.py)
+# One LLM call, OpenAI-compatible. Backtest-safe by construction (AD4).
+# ============================================================================
+SIGNAL_REASONER_CONFIG = {
+    "enabled_env_var": "ML_AGENT_ENABLED",        # "true"/"false"; default false
+    "api_key_env_var": "NVIDIA_API_KEY",
+    "api_url": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "model": "nvidia/nemotron-3-ultra-550b-a55b",
+    "timeout_env_var": "ML_AGENT_TIMEOUT_SEC",    # default 8 seconds
+    "default_timeout_sec": 8,
+    "temperature": 0.1,
+    "max_tokens": 200,
+    "fail_open": True,                              # AD5 — approve if LLM unavailable
+}
