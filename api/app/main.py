@@ -23,7 +23,6 @@ from datetime import datetime, timedelta, timezone
 import threading
 import time
 from typing import Dict, Any
-import threading
 import numpy as np
 
 try:
@@ -49,6 +48,7 @@ from api.app.watchlist import watchlist_bp
 from api.app.profile import profile_bp
 from api.app.middleware.error_handler import register_error_handlers
 from api.app.etl_routes import etl_bp
+from api.app.pipeline_routes import pipeline_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ def set_security_headers(response):
     
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://s.tradingview.com https://unpkg.com; "
+        "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://s.tradingview.com https://unpkg.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https:; "
@@ -196,6 +196,7 @@ init_auth(app)
 app.register_blueprint(watchlist_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(etl_bp)
+app.register_blueprint(pipeline_bp)
 
 
 # FIXED: Encapsulate all global state in proper classes for thread safety and testability
@@ -236,7 +237,7 @@ class ModelManager:
                     model = model_data
                     try:
                         feature_names = list(model.feature_names_in_) if hasattr(model, 'feature_names_in_') else None
-                    except:
+                    except (AttributeError, Exception):
                         feature_names = None
             
             if feature_names is not None:
@@ -286,14 +287,14 @@ class PredictionCache:
         with self._lock:
             if key in self._cache:
                 data, cache_time = self._cache[key]
-                if (datetime.utcnow() - cache_time).total_seconds() < self._ttl:
+                if (datetime.now(timezone.utc) - cache_time).total_seconds() < self._ttl:
                     return data
         return None
     
     def set(self, key: str, data):
         """Set cached data with current timestamp."""
         with self._lock:
-            self._cache[key] = (data, datetime.utcnow())
+            self._cache[key] = (data, datetime.now(timezone.utc))
     
     def clear(self, key: str = None):
         """Clear cache (specific key or all)."""
@@ -325,7 +326,7 @@ class FileCache:
                 data, cache_time, cached_mtime = self._cache[cache_key]
                 
                 # Check if cache is still valid (TTL and file not modified)
-                age = (datetime.utcnow() - cache_time).total_seconds()
+                age = (datetime.now(timezone.utc) - cache_time).total_seconds()
                 if age < self._ttl and current_mtime == cached_mtime:
                     return data
             
@@ -333,7 +334,7 @@ class FileCache:
             try:
                 with open(filepath, 'r') as f:
                     data = json.load(f)
-                self._cache[cache_key] = (data, datetime.utcnow(), current_mtime)
+                self._cache[cache_key] = (data, datetime.now(timezone.utc), current_mtime)
                 return data
             except Exception as e:
                 logger.error(f"Failed to load JSON file {filepath}: {e}")
@@ -350,54 +351,68 @@ class BacktestManager:
     
     def __init__(self):
         self._lock = threading.Lock()
-        self._status = {'running': False, 'progress': 0, 'error': None}
+        self._status = {'running': False, 'progress': 0, 'error': None, 'result': None}
     
     def is_running(self) -> bool:
-        """Check if backtest is currently running."""
         with self._lock:
             return self._status['running']
 
     def get_status(self) -> dict:
-        """Get current backtest status."""
         with self._lock:
             return self._status.copy()
 
     def run(self, start_date: str, end_date: str, asset: str = 'gold') -> dict:
-        """Run backtest with lock. Returns result dict."""
         with self._lock:
             if self._status['running']:
                 return {'error': 'Backtest already running', 'status': self._status}, 409
-            self._status = {'running': True, 'progress': 0, 'error': None}
+            self._status = {'running': True, 'progress': 0, 'error': None, 'result': None}
 
-        try:
-            import subprocess, sys
-            project_root = Path(__file__).parent.parent.parent
-            result = subprocess.run(
-                [sys.executable, 'run.py', '--mode', 'backtest', '--asset', asset],
-                capture_output=True,
-                text=True,
-                cwd=str(project_root),
-                timeout=300
-            )
+        def _run_backtest():
+            try:
+                import subprocess, sys
+                project_root = Path(__file__).parent.parent.parent
 
-            if result.returncode == 0:
                 with self._lock:
-                    self._status = {'running': False, 'progress': 100, 'error': None}
-                return {'status': 'completed', 'message': 'Backtest completed successfully'}, 200
-            else:
-                error_msg = result.stderr or 'Unknown error'
-                with self._lock:
-                    self._status = {'running': False, 'progress': 0, 'error': error_msg}
-                return {'error': f'Backtest failed: {error_msg}'}, 500
+                    self._status['progress'] = 10
 
-        except subprocess.TimeoutExpired:
-            with self._lock:
-                self._status = {'running': False, 'progress': 0, 'error': 'Timeout'}
-            return {'error': 'Backtest timed out after 5 minutes'}, 500
-        except Exception as e:
-            with self._lock:
-                self._status = {'running': False, 'progress': 0, 'error': str(e)}
-            return {'error': f'Backtest error: {str(e)}'}, 500
+                result = subprocess.run(
+                    [sys.executable, 'run.py', '--mode', 'backtest', '--asset', asset],
+                    capture_output=True, text=True, cwd=str(project_root), timeout=300
+                )
+
+                with self._lock:
+                    self._status['progress'] = 80
+
+                if result.returncode == 0:
+                    results_dir = project_root / 'reports' / 'backtest_results'
+                    latest_file = results_dir / 'latest.json'
+                    backtest_result = None
+                    if latest_file.exists():
+                        with open(latest_file) as f:
+                            backtest_result = json.load(f)
+
+                    with self._lock:
+                        self._status = {
+                            'running': False, 'progress': 100, 'error': None,
+                            'result': backtest_result
+                        }
+                else:
+                    with self._lock:
+                        self._status = {
+                            'running': False, 'progress': 0,
+                            'error': result.stderr or 'Unknown error', 'result': None
+                        }
+            except subprocess.TimeoutExpired:
+                with self._lock:
+                    self._status = {'running': False, 'progress': 0, 'error': 'Timeout', 'result': None}
+            except Exception as e:
+                with self._lock:
+                    self._status = {'running': False, 'progress': 0, 'error': str(e), 'result': None}
+
+        thread = threading.Thread(target=_run_backtest, daemon=True)
+        thread.start()
+
+        return {'status': 'started', 'message': 'Backtest started'}, 202
 
 
 # FIXED: Initialize managers (no global dicts!)
@@ -409,8 +424,16 @@ file_cache = FileCache(ttl_seconds=60)  # FIXED: Cache for JSON files
 # Initialize prediction logger and email alerts
 from etl.prediction_logger import PredictionLogger
 from etl.alerts import EmailAlertService
+from etl.guards.alert_risk_gate import AlertRiskGate
+from etl.agents.llm_client import NemotronClient
+from etl.agents.signal_reasoner import SignalReasoner
+
 prediction_logger = PredictionLogger()
 email_alerts = EmailAlertService(confidence_threshold=0.70)
+# Deterministic gate — runs unconditionally on every candidate alert.
+alert_risk_gate = AlertRiskGate()
+# LLM agent — off by default (ML_AGENT_ENABLED). Fail-open. Backtest path never imports this.
+signal_reasoner = SignalReasoner(client=NemotronClient(), pred_logger=prediction_logger)
 
 logger.info("✅ Server ready - models will be loaded on first request (lazy loading)")
 logger.info("✅ ModelManager, PredictionCache, BacktestManager, PredictionLogger initialized")
@@ -493,7 +516,7 @@ def get_live_price():
             'high': float(meta.get("regularMarketPrice", 0)),
             'low': float(meta.get("regularMarketPrice", 0)),
             'volume': int(meta.get("regularMarketVolume", 0)),
-            'timestamp': __import__('datetime').datetime.now().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
         })
     
     except Exception as e:
@@ -672,13 +695,49 @@ def get_latest_predictions():
             
             # Send email alert if confidence > 70% and signal is BUY/SELL
             if email_alerts.should_alert(latest['signal'], latest['confidence']):
-                email_alerts.send_alert(
-                    asset=asset,
-                    signal=latest['signal'],
-                    confidence=latest['confidence'],
-                    price=latest['price'],
-                    shap_values=latest.get('shap_values', [])
+                # Pull live indicator values for the gates/agent. These columns are
+                # produced by features/pipeline.engineer_all_features; guard with .get
+                # so a missing column never breaks the alert path.
+                last_row = recent_data.iloc[-1]
+
+                def _col(name, default=0.0):
+                    v = getattr(last_row, name, None) if hasattr(last_row, name) else last_row.get(name) if hasattr(last_row, 'get') else None
+                    try:
+                        return float(v) if v is not None and v == v else default
+                    except (TypeError, ValueError):
+                        return default
+
+                rsi = _col('rsi_14', _col('rsi', 50.0))
+                atr = _col('atr_14', _col('atr', 0.0))
+                ema20 = _col('ema_20', latest['price'])
+                ema50 = _col('ema_50', latest['price'])
+
+                # 1. Deterministic gate (always runs) — cooldown, session, volatility.
+                risk = alert_risk_gate.check(
+                    asset=asset, price=latest['price'], atr=atr,
+                    signal=latest['signal'], confidence=latest['confidence'],
                 )
+                if not risk.approved:
+                    logger.info(f"Alert suppressed by risk gate: {risk.reason}")
+                else:
+                    # 2. LLM agent gate (off by default, fail-open). Optional refinement.
+                    agent = signal_reasoner.evaluate(
+                        asset=asset, signal=latest['signal'],
+                        confidence=latest['confidence'], rsi=rsi, atr=atr,
+                        ema20=ema20, ema50=ema50, price=latest['price'],
+                    )
+                    if agent.source == "llm":
+                        logger.info(f"Agent decision: approved={agent.approved} ({agent.reason})")
+                    if agent.approved:
+                        email_alerts.send_alert(
+                            asset=asset,
+                            signal=latest['signal'],
+                            confidence=latest['confidence'],
+                            price=latest['price'],
+                            shap_values=latest.get('shap_values', [])
+                        )
+                    else:
+                        logger.info(f"Alert suppressed by agent: {agent.reason}")
         
         return jsonify({
             'asset': asset,
@@ -745,7 +804,7 @@ def get_backtest_results(current_user_email):
 
 @app.route('/api/backtest/run', methods=['POST'])
 @token_required
-@limiter.limit("1 per hour")  # FIXED: Limit to 1 backtest per hour per user
+@limiter.limit("1 per hour")
 def run_backtest(current_user_email):
     """Run backtest with specified parameters."""
     try:
@@ -759,13 +818,20 @@ def run_backtest(current_user_email):
         
         logger.info(f"Running {asset} backtest from {start_date} to {end_date}")
         
-        # FIXED: Use BacktestManager for thread-safe execution
         result, status_code = backtest_manager.run(start_date, end_date, asset=asset)
         return jsonify(result), status_code
     
     except Exception as e:
         logger.error(f"Error starting backtest: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/backtest/status', methods=['GET'])
+@token_required
+def get_backtest_status(current_user_email):
+    """Get current backtest execution status and progress."""
+    status = backtest_manager.get_status()
+    return jsonify(status), 200
 
 
 @app.route('/api/shap/feature-importance', methods=['GET'])
@@ -1033,7 +1099,7 @@ def start_prediction_updates():
                             'asset': asset,
                             'predictions': prediction_data['predictions'],
                             'total_signals': prediction_data['total_signals'],
-                            'timestamp': datetime.utcnow().isoformat(),
+                            'timestamp': datetime.now(timezone.utc).isoformat(),
                             'price': prediction_data['current_price']
                         })
                         logger.debug(f"Emitted {asset} predictions to {len(connected_clients)} clients")
@@ -1219,7 +1285,7 @@ def handle_connect():
     
     client_id = request.sid
     connected_clients[client_id] = {
-        'connected_at': datetime.utcnow(),
+        'connected_at': datetime.now(timezone.utc),
         'subscriptions': {}
     }
     

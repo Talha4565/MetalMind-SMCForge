@@ -203,3 +203,16 @@ class TestBasicFlows:
             raise PipelineError("test")
         except PipelineError as e:
             assert str(e) == "test"
+
+    def test_alert_risk_gate_smoke(self):
+        from etl.guards.alert_risk_gate import AlertRiskGate, RiskDecision
+        gate = AlertRiskGate({"enabled": True})
+        d = gate.check(asset="gold", price=2000.0, atr=2.0, signal=1, confidence=0.8)
+        assert isinstance(d, RiskDecision)
+
+    def test_signal_reasoner_smoke(self):
+        from etl.agents.signal_reasoner import SignalReasoner, AgentDecision
+        r = SignalReasoner(client=None, pred_logger=None)
+        d = r.evaluate(asset="gold", signal=1, confidence=0.8, rsi=55, atr=2.0,
+                       ema20=2000, ema50=1990, price=2005)
+        assert isinstance(d, AgentDecision)
