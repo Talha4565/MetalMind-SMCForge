@@ -3,34 +3,38 @@
 import React from 'react';
 import Header from './Header';
 import Sidebar from '@/components/Navigation/Sidebar';
-import Footer from './Footer';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   className?: string;
+  /** When true, content fills the full remaining height (no scroll padding) */
+  fullHeight?: boolean;
 }
 
 /**
- * Main layout for authenticated pages.
- * Includes Sidebar, Header, and Footer with responsive design.
- * Matches the Phase 3 plan specifications.
+ * Bloomberg Terminal layout.
+ * Sidebar (fixed 192px) + main column (Header sticky top + scrollable content).
+ * No footer — terminal UIs use all available screen space.
  */
-export default function DashboardLayout({ children, className }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, className, fullHeight }: DashboardLayoutProps) {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen w-full overflow-hidden bg-background">
       <Sidebar />
-      <main className="flex-1 flex flex-col min-w-0">
+
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header />
-        <div className={cn("flex-1 overflow-auto", className)}>
-          <div className="max-w-7xl mx-auto p-6">
-            {children}
-          </div>
+
+        <div
+          className={cn(
+            'flex-1 flex flex-col min-h-0',
+            fullHeight ? 'p-0 overflow-hidden' : 'p-4 overflow-y-auto overflow-x-hidden',
+            className
+          )}
+        >
+          {children}
         </div>
-        <div className="flex-shrink-0">
-          <Footer />
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

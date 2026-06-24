@@ -1,0 +1,17 @@
+{
+  "name": "metalmind-smcforge",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend-next && npm run dev",
+    "build": "cd frontend-next && npm run build",
+    "start": "cd frontend-next && npm run start",
+    "lint": "cd frontend-next && npm run lint"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.101.1",
+    "lucide-react": "^1.21.0",
+    "next-auth": "^4.24.14",
+    "react": "^19.2.7"
+  }
+}
