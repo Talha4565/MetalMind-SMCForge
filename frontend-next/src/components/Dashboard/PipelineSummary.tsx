@@ -1,93 +1,135 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Activity, Database, Cpu, CheckCircle2, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 interface PipelineStatus {
   status: 'active' | 'degraded';
   data_freshness: {
-    gold: { is_fresh: boolean; age_hours: number; rows: number };
+    gold:   { is_fresh: boolean; age_hours: number; rows: number };
     silver: { is_fresh: boolean; age_hours: number; rows: number };
   };
   models: {
-    gold: { exists: boolean; version: string; features: number };
+    gold:   { exists: boolean; version: string; features: number };
     silver: { exists: boolean; version: string; features: number };
   };
   last_update: string;
 }
 
+interface PillProps {
+  label: string;
+  value: string;
+  ok?: boolean;
+  neutral?: boolean;
+}
+
+function StatusPill({ label, value, ok, neutral }: PillProps) {
+  return (
+    <div className="flex items-center gap-1.5 border-r border-terminal-rule pr-4 last:border-0">
+      <span
+        className={cn('w-1.5 h-1.5 rounded-full shrink-0', {
+          'bg-terminal-buy': ok === true,
+          'bg-terminal-sell': ok === false,
+          'bg-terminal-hold': neutral,
+          'bg-terminal-label': ok === undefined && !neutral,
+        })}
+      />
+      <span className="text-[8px] font-mono text-terminal-label tracking-widest">{label}</span>
+      <span className={cn('text-[9px] font-mono font-bold tracking-wide', {
+        'text-terminal-buy': ok === true,
+        'text-terminal-sell': ok === false,
+        'text-terminal-hold': neutral,
+        'text-terminal-value': ok === undefined && !neutral,
+      })}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
 export default function PipelineSummary() {
   const [status, setStatus] = useState<PipelineStatus | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetch = async () => {
       try {
         const data = await apiClient.getPipelineStatus();
         setStatus(data);
       } catch {
         setStatus(null);
-      } finally {
-        setLoading(false);
       }
     };
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 60000);
-    return () => clearInterval(interval);
+    fetch();
+    const id = setInterval(fetch, 60000);
+    return () => clearInterval(id);
   }, []);
 
-  if (loading) {
+  // Fallback strip while loading or on error
+  if (!status) {
     return (
-      <Card className="bg-card border-border animate-pulse">
-        <CardContent className="p-4">
-          <div className="h-8 bg-muted rounded" />
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-4 px-4 py-1.5 border-b border-terminal-rule bg-terminal-panel">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-terminal-label animate-pulse" />
+          <span className="text-[8px] font-mono text-terminal-label tracking-widest">PIPELINE STATUS LOADING...</span>
+        </div>
+      </div>
     );
   }
 
-  if (!status) return null;
-
-  const isActive = status.status === 'active';
-  const goldFresh = status.data_freshness.gold.is_fresh;
+  const isActive   = status.status === 'active';
+  const goldFresh  = status.data_freshness.gold.is_fresh;
   const silverFresh = status.data_freshness.silver.is_fresh;
+  const goldModel  = status.models.gold;
+  const silverModel = status.models.silver;
 
   return (
-    <Card className="bg-card border-border">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-2.5 h-2.5 rounded-full",
-              isActive ? "bg-green-500 animate-pulse" : "bg-yellow-500"
-            )} />
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Pipeline Status</p>
-              <p className="text-sm font-bold text-card-foreground">
-                {isActive ? 'All Systems Operational' : 'Degraded'}
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-wrap items-center gap-4 px-4 py-1.5 border-b border-terminal-rule bg-terminal-panel overflow-x-auto">
+      {/* Overall */}
+      <StatusPill
+        label="PIPELINE"
+        value={isActive ? 'OPERATIONAL' : 'DEGRADED'}
+        ok={isActive}
+      />
 
-          <div className="flex items-center gap-6 text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Database className="w-3 h-3" />
-              <span>Data: {goldFresh && silverFresh ? 'Fresh' : 'Stale'}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Cpu className="w-3 h-3" />
-              <span>Model: {status.models.gold.version || 'N/A'}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Activity className="w-3 h-3" />
-              <span>89 Features</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      {/* Data freshness */}
+      <StatusPill
+        label="XAU DATA"
+        value={goldFresh ? `FRESH · ${status.data_freshness.gold.rows.toLocaleString()} rows` : `STALE · ${status.data_freshness.gold.age_hours.toFixed(1)}h`}
+        ok={goldFresh}
+      />
+      <StatusPill
+        label="XAG DATA"
+        value={silverFresh ? `FRESH · ${status.data_freshness.silver.rows.toLocaleString()} rows` : `STALE · ${status.data_freshness.silver.age_hours.toFixed(1)}h`}
+        ok={silverFresh}
+      />
+
+      {/* Models */}
+      <StatusPill
+        label="XAU MODEL"
+        value={goldModel.exists ? goldModel.version || 'LOADED' : 'MISSING'}
+        ok={goldModel.exists}
+      />
+      <StatusPill
+        label="XAG MODEL"
+        value={silverModel.exists ? silverModel.version || 'LOADED' : 'MISSING'}
+        ok={silverModel.exists}
+      />
+
+      {/* Features */}
+      <StatusPill
+        label="FEATURES"
+        value={`${goldModel.features || 89}`}
+        neutral
+      />
+
+      {/* Last update */}
+      <div className="ml-auto flex items-center gap-1.5">
+        <span className="text-[8px] font-mono text-terminal-label tracking-widest">REFRESHED</span>
+        <span className="text-[8px] font-mono text-terminal-value">
+          {new Date(status.last_update).toLocaleTimeString('en-US', { hour12: false })}
+        </span>
+      </div>
+    </div>
   );
 }
