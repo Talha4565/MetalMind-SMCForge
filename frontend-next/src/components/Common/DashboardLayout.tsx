@@ -27,7 +27,7 @@ export default function DashboardLayout({ children, className, fullHeight }: Das
 
         <div
           className={cn(
-            'flex-1 overflow-y-auto overflow-x-hidden',
+            'flex-1 overflow-y-auto overflow-x-hidden flex flex-col',
             fullHeight ? 'p-0' : 'p-4',
             className
           )}

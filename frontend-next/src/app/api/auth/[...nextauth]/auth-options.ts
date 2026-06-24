@@ -112,5 +112,6 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  // Fallback secret for local dev/preview only — never use in production without NEXTAUTH_SECRET set
+  secret: process.env.NEXTAUTH_SECRET ?? (process.env.NODE_ENV === 'development' ? 'dev-preview-secret-do-not-use-in-prod' : undefined),
 };

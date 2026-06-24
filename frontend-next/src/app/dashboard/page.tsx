@@ -58,7 +58,7 @@ export default function DashboardPage() {
     signalText === 'SELL' ? 'text-terminal-sell' : 'text-terminal-hold';
 
   return (
-    <DashboardLayout>
+    <DashboardLayout fullHeight>
       {/* ── Zone 1: Ticker/status bar ── */}
       <div className="flex items-center justify-between border-b border-terminal-rule bg-terminal-panel px-4 py-2 mb-0">
         {/* Asset selector */}
