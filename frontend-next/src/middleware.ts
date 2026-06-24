@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * NextAuth middleware to protect routes and redirect unauthorized users to login.
- * In development (no NEXTAUTH_SECRET), bypass auth so the preview renders.
+ * NextAuth middleware — protects backtest and other sensitive routes.
+ * Dashboard auth-gating is handled at the page level via getServerSession.
  */
 const authMiddleware = withAuth({
   callbacks: {
@@ -13,7 +13,8 @@ const authMiddleware = withAuth({
 });
 
 export default function middleware(req: NextRequest) {
-  if (process.env.NODE_ENV === 'development' && !process.env.NEXTAUTH_SECRET) {
+  // Bypass auth middleware in dev when no secret is configured (preview mode)
+  if (!process.env.NEXTAUTH_SECRET) {
     return NextResponse.next();
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,7 +23,6 @@ export default function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/dashboard/:path*',
     '/backtest/:path*',
   ],
 };

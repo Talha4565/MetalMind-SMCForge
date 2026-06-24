@@ -1,0 +1,11 @@
+{
+  "name": "metalmind-smcforge",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend-next && npm run dev",
+    "build": "cd frontend-next && npm run build",
+    "start": "cd frontend-next && npm run start",
+    "lint": "cd frontend-next && npm run lint"
+  }
+}

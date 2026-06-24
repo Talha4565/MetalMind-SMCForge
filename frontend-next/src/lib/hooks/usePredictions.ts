@@ -12,6 +12,7 @@ type SessionWithToken = {
 /**
  * Hook to fetch the latest predictions for a specific asset.
  * Uses TanStack Query for caching and automatic re-fetching.
+ * retry: 0 so offline API falls through immediately to mock data.
  */
 
 export function usePredictions(asset: AssetType): UseQueryResult<PredictionResponse, Error> {
@@ -27,7 +28,7 @@ export function usePredictions(asset: AssetType): UseQueryResult<PredictionRespo
     queryFn: () => apiClient.getLatestPrediction(asset),
     refetchInterval: 60000,
     staleTime: 30000,
-    retry: 2,
+    retry: 0,
     enabled: true,
   });
 }
