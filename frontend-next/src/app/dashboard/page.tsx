@@ -23,10 +23,50 @@ const SHAPExplainer = dynamic(() => import('@/components/Dashboard/SHAPExplainer
   ),
 });
 
+// Static mock used when backend is offline (preview / no API)
+const MOCK_PREDICTIONS: Record<AssetType, import('@/lib/api-types').PredictionItem> = {
+  gold: {
+    asset: 'gold',
+    signal: 'BUY',
+    confidence: 0.813,
+    probability: 0.813,
+    price: 3268.45,
+    timestamp: new Date().toISOString(),
+    shap_values: [
+      { feature: 'premium_discount_position', contribution:  0.412 },
+      { feature: 'CVD_16',                    contribution:  0.331 },
+      { feature: 'htf_1h_momentum',           contribution:  0.287 },
+      { feature: 'VWAPd_96',                  contribution:  0.215 },
+      { feature: 'session_london',            contribution:  0.198 },
+      { feature: 'htf_1h_atr',               contribution: -0.174 },
+      { feature: 'distance_from_equilibrium', contribution: -0.143 },
+      { feature: 'Imbal_16',                  contribution: -0.097 },
+    ],
+  },
+  silver: {
+    asset: 'silver',
+    signal: 'HOLD',
+    confidence: 0.621,
+    probability: 0.621,
+    price: 32.71,
+    timestamp: new Date().toISOString(),
+    shap_values: [
+      { feature: 'htf_1h_momentum',           contribution:  0.189 },
+      { feature: 'CVD_4',                     contribution:  0.143 },
+      { feature: 'premium_discount_position', contribution: -0.201 },
+      { feature: 'VWAPd_16',                  contribution: -0.162 },
+      { feature: 'session_ny',                contribution:  0.111 },
+      { feature: 'Ret_4',                     contribution: -0.088 },
+    ],
+  },
+};
+
 export default function DashboardPage() {
   const [activeAsset, setActiveAsset] = useState<AssetType>('gold');
-  const { data: rawPrediction, isLoading, refetch, isRefetching } = usePredictions(activeAsset);
-  const prediction = rawPrediction?.predictions?.slice(-1)[0];
+  const { data: rawPrediction, isLoading, isError, refetch, isRefetching } = usePredictions(activeAsset);
+  // Fall back to static mock when API is unreachable (offline / preview mode)
+  const apiPrediction = rawPrediction?.predictions?.slice(-1)[0];
+  const prediction = apiPrediction ?? ((!isLoading || isError) ? MOCK_PREDICTIONS[activeAsset] : undefined);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const { status } = useSession();
 
@@ -135,23 +175,15 @@ export default function DashboardPage() {
       <PipelineSummary />
 
       {/* ── Zone 3: Main 3-column terminal grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_260px] min-h-0 border-t border-terminal-rule">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[300px_1fr_260px] min-h-0 overflow-hidden border-t border-terminal-rule">
 
         {/* ── Left panel: Signal + SHAP ── */}
-        <div className="border-r border-terminal-rule flex flex-col overflow-y-auto">
+        <div className="border-r border-terminal-rule flex flex-col overflow-y-auto min-h-0">
           <TerminalPanelHeader label="SIGNAL ANALYSIS" code="SIG" />
           <div className="flex-1 p-3 space-y-3">
             <TerminalSignalPanel
-              prediction={prediction ?? {
-                asset: activeAsset,
-                signal: 'HOLD',
-                confidence: 0,
-                probability: 0,
-                price: 0,
-                timestamp: new Date().toISOString(),
-                shap_values: [],
-              }}
-              isLoading={isLoading}
+              prediction={prediction ?? MOCK_PREDICTIONS[activeAsset]}
+              isLoading={isLoading && !isError && !prediction}
               livePrice={livePrice}
             />
 
@@ -183,7 +215,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Center panel: Chart ── */}
-        <div className="flex flex-col min-h-0 border-r border-terminal-rule">
+        <div className="flex flex-col min-h-0 border-r border-terminal-rule overflow-hidden">
           <TerminalPanelHeader
             label={activeAsset === 'gold' ? 'XAU/USD — GOLD FUTURES' : 'XAG/USD — SILVER FUTURES'}
             code="CHT"
@@ -193,13 +225,13 @@ export default function DashboardPage() {
               </span>
             }
           />
-          <div className="flex-1 min-h-[420px]">
+          <div className="flex-1 min-h-0 h-full" style={{ minHeight: '480px' }}>
             <TradingViewChart asset={activeAsset} />
           </div>
         </div>
 
         {/* ── Right panel: Stats & model info ── */}
-        <div className="flex flex-col overflow-y-auto">
+        <div className="flex flex-col min-h-0 overflow-y-auto">
           <TerminalPanelHeader label="MARKET STATS" code="MKT" />
           <div className="flex-1 p-3">
             <TerminalStatsBar
