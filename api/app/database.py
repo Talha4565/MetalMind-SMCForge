@@ -214,6 +214,22 @@ class RateLimitLog(db.Model):
         return f'<RateLimitLog {self.ip_address} - {self.endpoint}>'
 
 
+def get_pool_stats():
+    """Get connection pool statistics for monitoring."""
+    try:
+        engine = db.engine
+        pool = engine.pool
+        return {
+            'pool_size': pool.size(),
+            'checked_in': pool.checkedin(),
+            'checked_out': pool.checkedout(),
+            'overflow': pool.overflow(),
+            'total_connections': pool.size() + pool.overflow(),
+        }
+    except Exception as e:
+        return {'error': str(e)}
+
+
 def init_database(app):
     """
     Initialize database with Flask app.
@@ -232,24 +248,19 @@ def init_database(app):
 
     app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    # FIXED: Proper connection pooling configuration for production
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,      # Test connections before using
-        'pool_recycle': 300,        # Recycle connections every 5 minutes
-        'pool_size': 20,            # FIXED: Maximum pool size (default 5 too low)
-        'max_overflow': 10,         # FIXED: Allow 10 additional connections
-        'pool_timeout': 30,         # FIXED: Timeout after 30 seconds
-        'echo_pool': False,         # Don't log pool activity (performance)
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 20,
+        'max_overflow': 10,
+        'pool_timeout': 30,
+        'echo_pool': False,
     }
     
     db.init_app(app)
     
     with app.app_context():
-        # In development or SQLite fallback, create missing tables automatically.
-        # In production with PostgreSQL, rely on migrations instead.
         if db_uri.startswith('sqlite://') or app.config.get('ENV') != 'production':
-            # Only run `create_all()` in explicit development mode to avoid
-            # running DDL from multiple Gunicorn workers (race conditions).
             if os.environ.get("FLASK_ENV") == "development":
                 attempts = 10
                 delay = 3

@@ -79,29 +79,33 @@ class MultiTimeframeLoader:
     def align_to_primary(self, primary_tf: str = "15m") -> pd.DataFrame:
         """
         Align all timeframes to the primary timeframe's timestamps.
-        This allows us to use features from multiple timeframes at each prediction point.
+        Skips any timeframe whose date range doesn't overlap significantly
+        with the primary (prevents short-lived feeds from NaN-ifying the dataset).
         """
         if primary_tf not in self.timeframes:
             raise ValueError(f"Primary timeframe {primary_tf} not loaded")
-        
+
         primary = self.timeframes[primary_tf].copy()
+        primary_start = primary.index.min()
+        primary_end = primary.index.max()
+        primary_span = (primary_end - primary_start).days
+
         logger.info(f"Aligning all timeframes to {primary_tf} (primary)")
-        
-        # For each higher timeframe, forward-fill to match primary timestamps
+
         for tf, df in self.timeframes.items():
             if tf == primary_tf:
                 continue
-            
-            # Resample to primary timeframe and forward-fill
-            # This gives us "what was the last known value from higher timeframe"
+
+            # Skip timeframes that cover less than 50% of the primary range
+            tf_span = (df.index.max() - df.index.min()).days
+            if tf_span < primary_span * 0.5:
+                logger.info(f"  Skipping {tf}: only {tf_span} days vs {primary_span} days primary")
+                continue
+
             aligned = df.reindex(primary.index, method='ffill')
-            
-            # Add prefix to columns to identify source timeframe
             aligned.columns = [f"{tf}_{col}" for col in aligned.columns]
-            
-            # Merge with primary
             primary = primary.join(aligned, how='left')
-        
+
         logger.info(f"Aligned dataset shape: {primary.shape}")
         return primary
     

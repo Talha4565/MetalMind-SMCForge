@@ -1,11 +1,10 @@
 """
-Automated pipeline: Fetch live data → Append to CSVs → Retrain model.
+Automated pipeline: Fetch live MT5 data → Append to CSVs → Retrain model.
 
 Usage:
-    python run_pipeline.py --mode backfill          # Fill gap from Sept 2024 to today
-    python run_pipeline.py --mode update            # Fetch latest candles only
+    python run_pipeline.py --mode update            # Fetch latest MT5 candles only
     python run_pipeline.py --mode retrain           # Retrain model on full data
-    python run_pipeline.py --mode full              # Backfill + Retrain
+    python run_pipeline.py --mode full              # Update + Retrain
     python run_pipeline.py --mode schedule          # Run continuously (15min update + 24h retrain)
     python run_pipeline.py --mode status            # Show pipeline status
     python run_pipeline.py --mode freshness         # Check data freshness
@@ -21,8 +20,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from etl.extractors.yfinance_extractor import YFinanceExtractor
-from etl.loaders.csv_append_loader import CSVAppendLoader
+from scripts.mt5_update import update_asset
 from etl.orchestrator import PipelineOrchestrator
 from config.settings import GOLD_DATASET_DIR, SILVER_DATASET_DIR, REPORTS_DIR
 
@@ -36,50 +34,23 @@ logger = logging.getLogger(__name__)
 orchestrator = PipelineOrchestrator()
 
 
-def run_fetch_and_append(asset: str, intervals: list = None):
-    """Fetch live data and append to CSVs."""
-    if intervals is None:
-        intervals = ['5m', '15m', '30m', '1h']
-    
+def run_update(asset: str):
+    """Fetch latest MT5 spot data and append to CSVs."""
     logger.info(f"=" * 60)
-    logger.info(f"FETCH & APPEND: {asset.upper()}")
+    logger.info(f"MT5 UPDATE: {asset.upper()}")
     logger.info(f"=" * 60)
-    
-    # Extract
-    extractor = YFinanceExtractor(asset=asset, intervals=intervals)
-    data = extractor.extract()
-    
-    if not data:
-        logger.error(f"No data fetched for {asset}")
-        return
-    
-    # Load (append to CSVs)
-    output_dir = GOLD_DATASET_DIR if asset == 'gold' else SILVER_DATASET_DIR
-    loader = CSVAppendLoader(
-        output_dir=str(output_dir),
-        asset=asset
-    )
-    success = loader.run(data)
-    
-    if success:
-        logger.info(f"✓ {asset.upper()} data appended successfully")
-    else:
-        logger.error(f"✗ Failed to append {asset.upper()} data")
+
+    update_asset(asset)
+    logger.info(f"✓ {asset.upper()} data updated from MT5")
 
 
 def run_backfill(asset: str):
-    """Backfill historical gap from Sept 2024 to today."""
+    """Backfill using MT5 — fetches latest 500 bars per timeframe."""
     logger.info(f"=" * 60)
     logger.info(f"BACKFILL: {asset.upper()}")
     logger.info(f"=" * 60)
-    
-    # Fetch all available intervals
-    # 1h covers 730 days (Sept 2024 → today)
-    # 15m/30m/5m cover last 60 days
-    intervals = ['5m', '15m', '30m', '1h']
-    
-    run_fetch_and_append(asset, intervals)
-    
+
+    run_update(asset)
     logger.info(f"✓ Backfill complete for {asset}")
 
 
@@ -112,24 +83,24 @@ def run_full_pipeline(asset: str):
 
 
 def run_schedule():
-    """Run continuous scheduler: 15min updates + 24h retrain."""
+    """Run continuous scheduler: 15min MT5 updates + 24h retrain."""
     from apscheduler.schedulers.blocking import BlockingScheduler
     from apscheduler.triggers.interval import IntervalTrigger
     from apscheduler.triggers.cron import CronTrigger
     
     scheduler = BlockingScheduler()
     
-    # Update data every 15 minutes
+    # Update data every 15 minutes from MT5
     for asset in ['gold', 'silver']:
         scheduler.add_job(
-            func=run_fetch_and_append,
+            func=run_update,
             trigger=IntervalTrigger(minutes=15),
-            args=[asset, ['5m', '15m', '30m', '1h']],
+            args=[asset],
             id=f'{asset}_update',
-            name=f'{asset} data update',
+            name=f'{asset} MT5 data update',
             replace_existing=True
         )
-        logger.info(f"Scheduled {asset} update every 15 minutes")
+        logger.info(f"Scheduled {asset} MT5 update every 15 minutes")
     
     # Retrain every 24 hours at 3 AM UTC
     for asset in ['gold', 'silver']:
@@ -144,21 +115,21 @@ def run_schedule():
         logger.info(f"Scheduled {asset} retrain daily at 03:00 UTC")
     
     logger.info("=" * 60)
-    logger.info("Pipeline scheduler started")
+    logger.info("Pipeline scheduler started (MT5 spot data)")
     logger.info("  Updates: every 15 minutes")
     logger.info("  Retrains: daily at 03:00 UTC")
     logger.info("=" * 60)
     
     # Run first update immediately
     for asset in ['gold', 'silver']:
-        run_fetch_and_append(asset)
+        run_update(asset)
     
     scheduler.start()
 
 
 def main():
-    parser = argparse.ArgumentParser(description='ML-Signals Automated Pipeline')
-    parser.add_argument('--mode', choices=['backfill', 'update', 'retrain', 'full', 'schedule', 'status', 'freshness', 'backups'],
+    parser = argparse.ArgumentParser(description='ML-Signals Automated Pipeline (MT5 Spot Data)')
+    parser.add_argument('--mode', choices=['update', 'retrain', 'full', 'schedule', 'status', 'freshness', 'backups'],
                        default='update', help='Pipeline mode')
     parser.add_argument('--asset', choices=['gold', 'silver'], default='gold',
                        help='Asset to process')
@@ -166,14 +137,13 @@ def main():
                        help='Optuna trials for retraining')
     args = parser.parse_args()
     
-    if args.mode == 'backfill':
-        run_backfill(args.asset)
-    elif args.mode == 'update':
-        run_fetch_and_append(args.asset)
+    if args.mode == 'update':
+        run_update(args.asset)
     elif args.mode == 'retrain':
         run_retrain(args.asset, args.trials)
     elif args.mode == 'full':
-        run_full_pipeline(args.asset)
+        run_update(args.asset)
+        run_retrain(args.asset, args.trials)
     elif args.mode == 'schedule':
         run_schedule()
     elif args.mode == 'status':
