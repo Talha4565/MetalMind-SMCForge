@@ -104,10 +104,10 @@ services:
     command: >
       sh -c "
         cd /app && \
-        python run_pipeline.py --mode schedule
+        echo 'ETL container ready. Data updates via MT5 on host machine.'
       "
     working_dir: /app
-    restart: unless-stopped
+    restart: "no"
     depends_on:
       api:
         condition: service_healthy
