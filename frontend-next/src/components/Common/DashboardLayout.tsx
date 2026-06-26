@@ -4,6 +4,7 @@ import React from 'react';
 import Header from './Header';
 import Sidebar from '@/components/Navigation/Sidebar';
 import { cn } from '@/lib/utils';
+import { useAlertNotifications } from '@/lib/hooks/useAlertNotifications';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,9 @@ interface DashboardLayoutProps {
  * No footer — terminal UIs use all available screen space.
  */
 export default function DashboardLayout({ children, className, fullHeight }: DashboardLayoutProps) {
+  // Initialize alert notifications listener
+  useAlertNotifications();
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       <Sidebar />

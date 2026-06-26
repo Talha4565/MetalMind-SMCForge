@@ -3,12 +3,13 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ShieldAlert, User, BarChart3, Activity, Eye, Menu, X } from 'lucide-react'
+import { Home, ShieldAlert, User, BarChart3, Activity, Eye, Radio, Menu, X } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/dashboard',           label: 'OVERVIEW',  short: 'OVR', icon: Home      },
+  { href: '/dashboard/signals',   label: 'SIGNALS',   short: 'SIG', icon: Radio      },
   { href: '/dashboard/watchlist', label: 'WATCHLIST', short: 'WCH', icon: Eye       },
   { href: '/backtest',            label: 'BACKTEST',  short: 'BKT', icon: BarChart3 },
   { href: '/dashboard/risk',      label: 'RISK',      short: 'RSK', icon: ShieldAlert },

@@ -40,7 +40,7 @@ function label(raw: string) {
 }
 
 interface Props {
-  prediction: PredictionItem;
+  prediction?: PredictionItem;
   isLoading?: boolean;
   livePrice?: number | null;
 }
@@ -49,8 +49,18 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
   const { data: wsData, isConnected, emit } = useWebSocket<PredictionItem>('predictions');
 
   useEffect(() => {
-    if (isConnected) emit('subscribe_predictions', { asset: prediction.asset });
-  }, [isConnected, prediction.asset, emit]);
+    if (isConnected && prediction) emit('subscribe_predictions', { asset: prediction.asset });
+  }, [isConnected, prediction?.asset, emit]);
+
+  if (!prediction) {
+    return (
+      <div className="space-y-2 animate-pulse">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-8 bg-terminal-panel border border-terminal-rule" />
+        ))}
+      </div>
+    );
+  }
 
   const current = wsData?.asset === prediction.asset ? wsData : prediction;
 
@@ -116,6 +126,30 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
           </p>
         </div>
       </div>
+
+      {/* TP/SL levels */}
+      {signalLabel !== 'HOLD' && (current as any).tp_level && (
+        <div className="grid grid-cols-2 gap-px bg-terminal-rule">
+          <div className="bg-terminal-panel px-3 py-2 border-l-2 border-terminal-buy">
+            <p className="text-[8px] font-mono text-terminal-buy tracking-widest mb-1">TAKE PROFIT</p>
+            <p className="text-[13px] font-mono font-black text-terminal-buy tabular-nums">
+              ${(current as any).tp_level?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[9px] font-mono text-terminal-label mt-0.5">
+              +{(current as any).tp_distance}%
+            </p>
+          </div>
+          <div className="bg-terminal-panel px-3 py-2 border-l-2 border-terminal-sell">
+            <p className="text-[8px] font-mono text-terminal-sell tracking-widest mb-1">STOP LOSS</p>
+            <p className="text-[13px] font-mono font-black text-terminal-sell tabular-nums">
+              ${(current as any).sl_level?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[9px] font-mono text-terminal-label mt-0.5">
+              -{(current as any).sl_distance}%
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Connection status */}
       <div className="flex items-center gap-1.5 px-1">

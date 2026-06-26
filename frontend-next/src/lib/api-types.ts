@@ -140,6 +140,47 @@ export interface SymbolsResponse {
   symbols: WatchlistSymbol[];
 }
 
+// --- Signal History Types ---
+
+export interface SignalHistoryRecord {
+  timestamp: string;
+  asset: string;
+  signal: number;
+  signal_text: string;
+  confidence: number;
+  price: number;
+  shap_values: SHAPValue[];
+  model_version: string;
+  actual_outcome: string | null;
+  actual_pnl: number | null;
+  outcome_checked_at: string | null;
+  tp_distance: number | null;
+  sl_distance: number | null;
+  tp_level: number | null;
+  sl_level: number | null;
+}
+
+export interface SignalHistorySummary {
+  total: number;
+  buys: number;
+  sells: number;
+  holds: number;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  avg_confidence: number;
+  avg_pnl: number;
+}
+
+export interface SignalHistoryResponse {
+  predictions: SignalHistoryRecord[];
+  summary: SignalHistorySummary;
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
 // --- Error Types ---
 
 export interface ApiError {

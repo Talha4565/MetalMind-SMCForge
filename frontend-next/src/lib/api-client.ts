@@ -11,6 +11,7 @@ import {
   WatchlistResponse,
   SymbolsResponse,
   Profile,
+  SignalHistoryResponse,
 } from './api-types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -193,6 +194,24 @@ class ApiClient {
   // Predictions
   async getLatestPrediction(asset: AssetType): Promise<PredictionResponse> {
     const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`);
+    return response.data;
+  }
+
+  async getSignalHistory(params: {
+    asset?: string;
+    signal?: string;
+    days?: number;
+    page?: number;
+    per_page?: number;
+  } = {}): Promise<SignalHistoryResponse> {
+    const query = new URLSearchParams();
+    if (params.asset && params.asset !== 'all') query.set('asset', params.asset);
+    if (params.signal && params.signal !== 'all') query.set('signal', params.signal);
+    if (params.days) query.set('days', String(params.days));
+    if (params.page) query.set('page', String(params.page));
+    if (params.per_page) query.set('per_page', String(params.per_page));
+    const qs = query.toString();
+    const response = await this.client.get<SignalHistoryResponse>(`/api/predictions/history${qs ? `?${qs}` : ''}`);
     return response.data;
   }
 
