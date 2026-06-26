@@ -90,23 +90,29 @@ class EnhancedModelTrainer:
         
         def objective(trial):
             params = {
-                'n_estimators': 1000,
-                'max_depth': trial.suggest_int('max_depth', 3, 5),
+                'max_depth': trial.suggest_int('max_depth', 3, 8),
                 'learning_rate': trial.suggest_float('lr', 0.01, 0.05, log=True),
                 'subsample': trial.suggest_float('sub', 0.6, 0.9),
                 'colsample_bytree': trial.suggest_float('col', 0.5, 0.8),
-                'objective': 'binary:logistic',
-                'eval_metric': 'logloss',
+                'objective': 'multi:softmax',
+                'num_class': 3,
+                'eval_metric': 'mlogloss',
                 'early_stopping_rounds': 50,
                 'random_state': 42
             }
-            
+
+            # Remap labels: {-1, 0, 1} -> {0, 1, 2} for XGBoost
+            y_train_mapped = self.train_y.map({-1: 0, 0: 1, 1: 2})
+            y_val_mapped = self.val_y.map({-1: 0, 0: 1, 1: 2})
+
             model = xgb.XGBClassifier(**params)
-            model.fit(self.train_x, self.train_y, 
-                     eval_set=[(self.val_x, self.val_y)], 
+            model.fit(self.train_x, y_train_mapped,
+                     eval_set=[(self.val_x, y_val_mapped)],
                      verbose=0)
-            
-            pred = model.predict(self.val_x)
+
+            pred_mapped = model.predict(self.val_x)
+            # Remap predictions back: {0, 1, 2} -> {-1, 0, 1}
+            pred = pd.Series(pred_mapped).map({0: -1, 1: 0, 2: 1}).values
             return 1 - accuracy_score(self.val_y, pred)
         
         logger.info(f"Starting Optuna optimization ({n_trials} trials)...")
@@ -124,15 +130,20 @@ class EnhancedModelTrainer:
         return self.best_params
     
     def train_final_model(self):
-        """Train final model with best hyperparameters."""
+        """Train final model with best hyperparameters (3-class)."""
         logger.info("=" * 80)
         logger.info("STEP 3: FINAL MODEL TRAINING")
         logger.info("=" * 80)
-        
-        # Calculate class weights
-        scale = (self.train_y == 0).sum() / (self.train_y == 1).sum()
-        logger.info(f"Class imbalance ratio: {scale:.2f}:1")
-        
+
+        # Remap labels: {-1, 0, 1} -> {0, 1, 2} for XGBoost
+        y_train_mapped = self.train_y.map({-1: 0, 0: 1, 1: 2})
+        y_val_mapped = self.val_y.map({-1: 0, 0: 1, 1: 2})
+
+        # Class distribution
+        for cls, label in [(0, 'SELL'), (1, 'HOLD'), (2, 'BUY')]:
+            count = (y_train_mapped == cls).sum()
+            logger.info(f"  {label}: {count} samples ({count/len(y_train_mapped)*100:.1f}%)")
+
         # Build model with best params
         self.model = xgb.XGBClassifier(
             n_estimators=1500,
@@ -140,37 +151,42 @@ class EnhancedModelTrainer:
             learning_rate=self.best_params['lr'],
             colsample_bytree=self.best_params['col'],
             subsample=self.best_params['sub'],
-            objective='binary:logistic',
-            eval_metric='logloss',
-            scale_pos_weight=scale,
+            objective='multi:softmax',
+            num_class=3,
+            eval_metric='mlogloss',
             early_stopping_rounds=50,
             random_state=42
         )
-        
+
         logger.info("Training final model...")
         self.model.fit(
-            self.train_x, self.train_y,
-            eval_set=[(self.val_x, self.val_y)],
+            self.train_x, y_train_mapped,
+            eval_set=[(self.val_x, y_val_mapped)],
             verbose=0
         )
-        
-        logger.info("✅ Training complete")
+
+        logger.info("Training complete")
     
     def evaluate_and_compare(self):
         """Evaluate enhanced model and compare with baseline."""
         logger.info("=" * 80)
         logger.info("STEP 4: EVALUATION & COMPARISON")
         logger.info("=" * 80)
-        
+
+        # Remap test labels for evaluation
+        y_test_mapped = self.test_y.map({-1: 0, 0: 1, 1: 2})
+
         # Enhanced model predictions
-        enhanced_pred = self.model.predict(self.test_x)
-        enhanced_prob = self.model.predict_proba(self.test_x)[:, 1]
+        enhanced_pred_mapped = self.model.predict(self.test_x)
+        # Remap back: {0, 1, 2} -> {-1, 0, 1}
+        enhanced_pred = pd.Series(enhanced_pred_mapped).map({0: -1, 1: 0, 2: 1}).values
         enhanced_acc = accuracy_score(self.test_y, enhanced_pred)
-        
-        logger.info("\n📊 ENHANCED MODEL RESULTS:")
+
+        label_map = {-1: 'SELL', 0: 'HOLD', 1: 'BUY'}
+        logger.info("\nEnhanced model results:")
         logger.info(f"Test Accuracy: {enhanced_acc:.2%}")
         logger.info("\nClassification Report:")
-        print(classification_report(self.test_y, enhanced_pred))
+        print(classification_report(self.test_y, enhanced_pred, target_names=['SELL', 'HOLD', 'BUY']))
         
         # Baseline comparison (if available)
         if self.baseline_model is not None:
@@ -208,11 +224,12 @@ class EnhancedModelTrainer:
         return {
             'enhanced_accuracy': enhanced_acc,
             'enhanced_predictions': enhanced_pred,
-            'enhanced_probabilities': enhanced_prob
         }
     
-    def save_model(self, filename: str = "enhanced_15m.pkl"):
+    def save_model(self, filename: str = None):
         """Save trained model."""
+        if filename is None:
+            filename = f"{self.asset}_enhanced_15m.pkl"
         save_path = MODEL_CONFIG['enhanced_model_path'].parent / filename
         save_path.parent.mkdir(exist_ok=True, parents=True)
         
