@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # WSGI middleware: handle CORS for ALL paths including /socket.io
-ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.1.102:3000"}
 
 class CORSProxy:
     """Wraps every response with CORS headers — sits above engine.io."""
@@ -198,6 +198,9 @@ app.register_blueprint(profile_bp)
 app.register_blueprint(etl_bp)
 app.register_blueprint(pipeline_bp)
 
+from api.app.alert_routes import alert_bp
+app.register_blueprint(alert_bp)
+
 
 # FIXED: Encapsulate all global state in proper classes for thread safety and testability
 MODELS_DIR = Path(__file__).parent.parent.parent / 'models'
@@ -208,32 +211,32 @@ class ModelManager:
     def __init__(self):
         self._models = {}
         self._feature_names = {}
+        self._v4_models = {}
         self._lock = threading.Lock()
         self.models_dir = MODELS_DIR
     
     def load_model(self, asset: str) -> tuple:
         """Load model for specific asset."""
-        if asset == "gold":
-            model_path = self.models_dir / 'enhanced_15m.pkl'
-        elif asset == "silver":
-            model_path = self.models_dir / 'processed' / 'silver_model_enhanced.pkl'
-        else:
-            return None, None
+        model_path = self.models_dir / f'{asset}_enhanced_15m.pkl'
+        if not model_path.exists():
+            if asset == "gold":
+                model_path = self.models_dir / 'enhanced_15m.pkl'
+            elif asset == "silver":
+                model_path = self.models_dir / 'processed' / 'silver_model_enhanced.pkl'
+            else:
+                return None, None
         
         if not model_path.exists():
-            logger.warning(f"⚠️ Model file not found for {asset}: {model_path}")
+            logger.warning(f"Model file not found for {asset}: {model_path}")
             return None, None
         
         try:
             with open(model_path, 'rb') as f:
                 model_data = pickle.load(f)
-                
-                # Handle different pickle formats
                 if isinstance(model_data, dict):
                     model = model_data['model']
                     feature_names = model_data.get('features', None)
                 else:
-                    # If it's just the model object
                     model = model_data
                     try:
                         feature_names = list(model.feature_names_in_) if hasattr(model, 'feature_names_in_') else None
@@ -241,17 +244,35 @@ class ModelManager:
                         feature_names = None
             
             if feature_names is not None:
-                logger.info(f"✅ {asset.upper()} model loaded: {len(feature_names)} features")
+                logger.info(f"{asset.upper()} model loaded: {len(feature_names)} features")
             else:
-                logger.info(f"✅ {asset.upper()} model loaded (feature names will be inferred)")
+                logger.info(f"{asset.upper()} model loaded")
             
             return model, feature_names
         
         except Exception as e:
-            logger.error(f"❌ Failed to load {asset} model: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Failed to load {asset} model: {e}")
             return None, None
+    
+    def load_v4_model(self, asset: str) -> dict:
+        """Load v4 regression model (direction + TP/SL)."""
+        if asset in self._v4_models:
+            return self._v4_models[asset]
+        
+        v4_path = self.models_dir / f'{asset}_regression_system.pkl'
+        if not v4_path.exists():
+            logger.warning(f"v4 model not found: {v4_path}")
+            return None
+        
+        try:
+            with open(v4_path, 'rb') as f:
+                data = pickle.load(f)
+            self._v4_models[asset] = data
+            logger.info(f"v4 model loaded for {asset}: direction + TP/SL")
+            return data
+        except Exception as e:
+            logger.error(f"Failed to load v4 model: {e}")
+            return None
     
     def get_or_load_model(self, asset: str) -> tuple:
         """Get model, loading it lazily if needed. Thread-safe."""
@@ -260,16 +281,14 @@ class ModelManager:
                 logger.info(f"Lazy loading {asset} model...")
                 self._models[asset], self._feature_names[asset] = self.load_model(asset)
                 if self._models[asset] is None:
-                    logger.warning(f"⚠️ Model not found for {asset}. Train it first.")
+                    logger.warning(f"Model not found for {asset}. Train it first.")
             return self._models.get(asset), self._feature_names.get(asset)
     
     def is_loaded(self, asset: str) -> bool:
-        """Check if model is loaded."""
         with self._lock:
             return asset in self._models and self._models[asset] is not None
     
     def get_loaded_models(self) -> dict:
-        """Get status of all models."""
         with self._lock:
             return {asset: (self._models.get(asset) is not None) for asset in ['gold', 'silver']}
 
@@ -421,6 +440,107 @@ prediction_cache = PredictionCache(ttl_seconds=300)
 backtest_manager = BacktestManager()
 file_cache = FileCache(ttl_seconds=60)  # FIXED: Cache for JSON files
 
+# NEW: Response cache for API endpoints (saves 500ms-2s per request)
+class ResponseCache:
+    """Simple in-memory cache for API responses with TTL."""
+    
+    def __init__(self):
+        self._cache = {}
+        self._lock = threading.Lock()
+    
+    def get(self, key: str):
+        with self._lock:
+            if key in self._cache:
+                data, expiry = self._cache[key]
+                if datetime.now(timezone.utc) < expiry:
+                    return data
+                del self._cache[key]
+        return None
+    
+    def set(self, key: str, data, ttl_seconds: int = 30):
+        with self._lock:
+            expiry = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+            self._cache[key] = (data, expiry)
+    
+    def clear(self, key: str = None):
+        with self._lock:
+            if key:
+                self._cache.pop(key, None)
+            else:
+                self._cache.clear()
+
+response_cache = ResponseCache()
+
+# Circuit breaker for external API calls (Yahoo Finance)
+class CircuitBreaker:
+    """Prevents cascading failures when external services are down."""
+    
+    def __init__(self, failure_threshold=5, recovery_timeout=60):
+        self._failure_count = 0
+        self._failure_threshold = failure_threshold
+        self._recovery_timeout = recovery_timeout
+        self._last_failure_time = None
+        self._state = 'closed'  # closed, open, half-open
+        self._lock = threading.Lock()
+    
+    def call(self, func, *args, **kwargs):
+        """Execute function with circuit breaker protection."""
+        with self._lock:
+            if self._state == 'open':
+                if self._last_failure_time and \
+                   (datetime.now(timezone.utc) - self._last_failure_time).total_seconds() > self._recovery_timeout:
+                    self._state = 'half-open'
+                    logger.info("Circuit breaker: half-open, trying request")
+                else:
+                    raise Exception("Circuit breaker OPEN - external service unavailable")
+        
+        try:
+            result = func(*args, **kwargs)
+            with self._lock:
+                self._failure_count = 0
+                self._state = 'closed'
+            return result
+        except Exception as e:
+            with self._lock:
+                self._failure_count += 1
+                self._last_failure_time = datetime.now(timezone.utc)
+                if self._failure_count >= self._failure_threshold:
+                    self._state = 'open'
+                    logger.warning(f"Circuit breaker OPEN after {self._failure_count} failures")
+            raise
+    
+    def get_state(self):
+        with self._lock:
+            return {
+                'state': self._state,
+                'failure_count': self._failure_count,
+                'last_failure': self._last_failure_time.isoformat() if self._last_failure_time else None
+            }
+
+MT5_SYMBOLS = {'gold': 'XAUUSD', 'silver': 'XAGUSD'}
+MT5_CACHE_FILE = Path(__file__).parent.parent.parent / 'reports' / 'mt5_prices.json'
+
+def fetch_mt5_price(asset: str) -> dict:
+    """Fetch live spot price from MT5 price cache file."""
+    try:
+        if MT5_CACHE_FILE.exists():
+            import json
+            prices = json.loads(MT5_CACHE_FILE.read_text())
+            data = prices.get(asset)
+            if data:
+                # Check if cache is fresh (less than 30 seconds old)
+                cache_time = datetime.fromisoformat(data['timestamp'])
+                age = (datetime.now(timezone.utc) - cache_time).total_seconds()
+                if age < 30:
+                    return data
+                else:
+                    logger.debug(f"MT5 cache stale ({age:.0f}s old)")
+        return None
+    except Exception as e:
+        logger.error(f"MT5 cache read failed: {e}")
+        return None
+
+
 # Initialize prediction logger and email alerts
 from etl.prediction_logger import PredictionLogger
 from etl.alerts import EmailAlertService
@@ -442,49 +562,50 @@ logger.info("✅ ModelManager, PredictionCache, BacktestManager, PredictionLogge
 @app.route('/api/health', methods=['GET'])
 @limiter.limit("10 per minute")
 def health_check():
-    """FIXED: Enhanced health check with comprehensive status."""
-    try:
-        # Check database connection
-        db_healthy = False
+    """Health check with long-polling support.
+
+    Send If-None-Match header with previous ETag to hold connection
+    until status changes (up to 30s).
+    """
+    from api.app.long_poll import long_poll, make_etag
+
+    def _check():
         try:
-            from api.app.database import db
+            from api.app.database import db, get_pool_stats
             from sqlalchemy import text
             db.session.execute(text('SELECT 1'))
             db_healthy = True
-        except Exception as e:
-            logger.error(f"Database health check failed: {e}")
-        
-        # Get model status
+        except Exception:
+            db_healthy = False
+
         models_status = model_manager.get_loaded_models()
-        
-        # Check file system access (use absolute paths from project root)
+        pool_stats = get_pool_stats()
+
         project_root = Path(__file__).parent.parent.parent
         fs_healthy = (project_root / 'reports').exists() and (project_root / 'models').exists()
-        
-        # Overall health - filesystem is not critical, just log warning
-        overall_healthy = db_healthy  # Only DB is critical for health
-        
-        return jsonify({
+
+        overall_healthy = db_healthy
+
+        data = {
             'status': 'healthy' if overall_healthy else 'degraded',
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'checks': {
                 'database': 'ok' if db_healthy else 'error',
                 'filesystem': 'ok' if fs_healthy else 'error',
-                'models': models_status
+                'models': models_status,
+                'connection_pool': pool_stats,
             },
-            'version': '1.0.0'
-        }), 200 if overall_healthy else 503
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 503
+            'version': '1.0.0',
+        }
+        return make_etag(data), data
+
+    return long_poll(etag_key='health', check_fn=_check, timeout=30)
 
 
 @app.route('/api/market/price', methods=['GET'])
 @limiter.limit("30 per minute")
 def get_live_price():
-    """Fetch real-time price from Yahoo Finance.
+    """Fetch real-time spot price from MT5 (cached for 10s).
     
     Query params:
         asset: gold or silver (default: gold)
@@ -492,36 +613,44 @@ def get_live_price():
     try:
         asset = request.args.get('asset', 'gold').lower()
         
-        ticker_map = {
-            'gold': 'GC=F',
-            'silver': 'SI=F',
-        }
-        
-        if asset not in ticker_map:
+        if asset not in MT5_SYMBOLS:
             return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
         
-        import requests as req
-        ticker = ticker_map[asset]
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = req.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        chart = resp.json()["chart"]["result"][0]
-        meta = chart["meta"]
+        # Check cache first (10s TTL for live prices)
+        cache_key = f"price_{asset}"
+        cached = response_cache.get(cache_key)
+        if cached:
+            return jsonify(cached)
         
-        return jsonify({
-            'asset': asset,
-            'price': float(meta["regularMarketPrice"]),
-            'open': float(meta.get("chartPreviousClose", meta["regularMarketPrice"])),
-            'high': float(meta.get("regularMarketPrice", 0)),
-            'low': float(meta.get("regularMarketPrice", 0)),
-            'volume': int(meta.get("regularMarketVolume", 0)),
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-        })
+        # Fetch from MT5
+        mt5_data = fetch_mt5_price(asset)
+        
+        if mt5_data:
+            result = {
+                'asset': asset,
+                'price': mt5_data['ask'],
+                'bid': mt5_data['bid'],
+                'ask': mt5_data['ask'],
+                'spread': mt5_data['spread'],
+                'source': 'MT5',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }
+        else:
+            return jsonify({'error': 'MT5 price cache unavailable. Ensure MT5 is running.', 'asset': asset}), 503
+        
+        # Cache for 10 seconds
+        response_cache.set(cache_key, result, ttl_seconds=10)
+        
+        return jsonify(result)
     
     except Exception as e:
         logger.error(f"Error fetching live price: {e}")
-        return jsonify({'error': str(e)}), 500
+        # Return cached data if available, even if expired
+        stale = response_cache.get(cache_key)
+        if stale:
+            stale['stale'] = True
+            return jsonify(stale)
+        return jsonify({'error': 'Price data temporarily unavailable', 'asset': asset}), 503
 
 
 @app.route('/api/predictions/latest', methods=['GET'])
@@ -549,10 +678,19 @@ def get_latest_predictions():
         if asset not in ['gold', 'silver']:
             return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
         
+        # Check response cache first (30s TTL)
+        resp_cache_key = f"predictions_{asset}_{limit}"
+        cached_response = response_cache.get(resp_cache_key)
+        if cached_response:
+            return jsonify(cached_response)
+        
         # FIXED: Use ModelManager for lazy loading
         model, feature_names = model_manager.get_or_load_model(asset)
         if model is None:
             return jsonify({'error': f'Model not found for {asset}. Train it first.'}), 404
+        
+        # Load v4 model (direction + TP/SL)
+        v4_data = model_manager.load_v4_model(asset)
         
         # FIXED: Use PredictionCache manager
         cache_key = f"{asset}_predictions"
@@ -573,24 +711,23 @@ def get_latest_predictions():
         # Work on a COPY to avoid corrupting the cached dataframe
         df = df.copy()
         
-        # Inject current live price into the latest bar
+        # Inject current live spot price from MT5
         try:
-            import requests as req
-            ticker_map = {'gold': 'XAUUSD=X', 'silver': 'XAGUSD=X'}
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_map[asset]}?interval=1m&range=1d"
-            resp = req.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            resp.raise_for_status()
-            meta = resp.json()["chart"]["result"][0]["meta"]
-            live_price = float(meta["regularMarketPrice"])
+            mt5_data = fetch_mt5_price(asset)
+            if mt5_data:
+                live_price = mt5_data['ask']
+            else:
+                logger.warning(f"MT5 price cache unavailable for {asset}, using last known price")
+                live_price = None
             
-            # Update the latest bar with current price
-            latest_idx = df.index[-1]
-            df.loc[latest_idx, 'close'] = live_price
-            df.loc[latest_idx, 'open'] = live_price
-            df.loc[latest_idx, 'high'] = live_price
-            df.loc[latest_idx, 'low'] = live_price
-            df.loc[latest_idx, 'price'] = live_price
-            logger.info(f"Injected live price ${live_price:.2f} into latest {asset} bar")
+            if live_price:
+                latest_idx = df.index[-1]
+                df.loc[latest_idx, 'close'] = live_price
+                df.loc[latest_idx, 'open'] = live_price
+                df.loc[latest_idx, 'high'] = live_price
+                df.loc[latest_idx, 'low'] = live_price
+                df.loc[latest_idx, 'price'] = live_price
+                logger.info(f"Injected live spot price ${live_price:.2f} into latest {asset} bar")
         except Exception as e:
             logger.warning(f"Could not fetch live price for prediction: {e}")
         
@@ -598,11 +735,9 @@ def get_latest_predictions():
         recent_data = df.iloc[-limit:].copy()
         
         # FIXED: Robustly align column names with model expectations
-        # Use a copy for prediction to avoid breaking the response preparation
         X_input = recent_data.copy()
         
         if feature_names is not None:
-            # Create a normalized mapping for current columns
             current_cols = X_input.columns
             col_lookup = {}
             for col in current_cols:
@@ -620,28 +755,113 @@ def get_latest_predictions():
                     rename_map[col_lookup[feat_norm]] = feat
             
             if rename_map:
-                logger.info(f"Mapping {len(rename_map)} features for prediction")
                 X_input.rename(columns=rename_map, inplace=True)
             
             try:
-                # Reorder and select only needed features
                 X = X_input[feature_names]
             except KeyError as e:
-                logger.error(f"❌ Final alignment failed. Missing: {e}")
+                logger.error(f"Final alignment failed. Missing: {e}")
                 available_features = [f for f in feature_names if f in X_input.columns]
                 X = X_input[available_features]
         else:
             X = X_input.select_dtypes(include=['float64', 'int64'])
-        
-        # Get predictions and probabilities
-        predictions = model.predict(X)
 
-        
-        try:
-            probabilities = model.predict_proba(X)[:, 1]  # Probability of signal
-        except (AttributeError, IndexError):
-            # Fallback for models without predict_proba
-            probabilities = [0.5] * len(predictions)
+        # === V4 MODEL: Direction + TP/SL with trend filter ===
+        if v4_data is not None:
+            dir_model = v4_data['direction_model']
+            tp_model = v4_data['tp_model']
+            sl_model = v4_data['sl_model']
+            v4_features = v4_data['features']
+            
+            # Add v4-specific features that aren't in standard pipeline
+            def compute_adx_local(df, period=14):
+                h, l, c = df["high"], df["low"], df["close"]
+                pdm = h.diff()
+                mdm = -l.diff()
+                pdm = pdm.where((pdm > mdm) & (pdm > 0), 0.0)
+                mdm = mdm.where((mdm > pdm) & (mdm > 0), 0.0)
+                tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+                atr = tr.rolling(period).mean()
+                pdi = 100 * pdm.rolling(period).mean() / atr
+                mdi = 100 * mdm.rolling(period).mean() / atr
+                dx = 100 * (pdi - mdi).abs() / (pdi + mdi).replace(0, np.nan)
+                return dx.rolling(period).mean()
+            
+            def compute_cvd_local(df):
+                delta = df["close"] - df["open"]
+                return (np.sign(delta) * df["volume"]).cumsum()
+            
+            # Add features to X_input
+            if 'cvd_15m' not in X_input.columns:
+                X_input['cvd_15m'] = compute_cvd_local(X_input)
+                X_input['cvd_15m_slope'] = X_input['cvd_15m'].diff(5)
+            
+            if 'cvd_30m' not in X_input.columns:
+                # Approximate 30m CVD using rolling sum
+                X_input['cvd_30m'] = X_input['cvd_15m'].rolling(2).sum()
+                X_input['cvd_30m_slope'] = X_input['cvd_30m'].diff(5)
+            
+            if 'adx_14' not in X_input.columns:
+                X_input['adx_14'] = compute_adx_local(X_input, 14)
+                X_input['adx_trending'] = (X_input['adx_14'] > 25).astype(int)
+            
+            # ATR
+            if 'atr_14' not in X_input.columns:
+                tr = pd.concat([
+                    X_input["high"] - X_input["low"],
+                    (X_input["high"] - X_input["close"].shift()).abs(),
+                    (X_input["low"] - X_input["close"].shift()).abs(),
+                ], axis=1).max(axis=1)
+                X_input['atr_14'] = tr.rolling(14).mean()
+            
+            # 1h trend features (use 1h data if available)
+            if 'trend_ema_cross' not in X_input.columns:
+                # Simple trend proxy using 15m data
+                ema50 = X_input['close'].ewm(span=50, adjust=False).mean()
+                ema200 = X_input['close'].ewm(span=200, adjust=False).mean()
+                X_input['trend_ema_cross'] = (ema50 > ema200).astype(int)
+                X_input['trend_price_vs_ema'] = ((X_input['close'] - ema50) / ema50).clip(-0.05, 0.05)
+                X_input['trend_adx'] = compute_adx_local(X_input, 14)
+                X_input['trend_strength'] = X_input['trend_adx'].clip(0, 50) / 50
+            
+            # Ensure all v4 features exist
+            for feat in v4_features:
+                if feat not in X_input.columns:
+                    X_input[feat] = 0.0
+            
+            # Direction predictions
+            proba = dir_model.predict_proba(X_input[v4_features])[:, 1]
+            confident = np.abs(proba - 0.5) >= 0.15
+            preds_raw = (proba >= 0.5).astype(int)
+            
+            # Trend filter
+            if 'trend_ema_cross' in X_input.columns:
+                trend = X_input['trend_ema_cross'].values
+                aligned = np.where(
+                    (preds_raw == 1) & (trend == 1), 1,
+                    np.where((preds_raw == 0) & (trend == 0), 0, -1)
+                )
+            else:
+                aligned = preds_raw
+            predictions = np.where(confident, aligned, -1)
+            probabilities = np.where(proba >= 0.5, proba, 1 - proba)
+            
+            # TP/SL predictions
+            tp_pred = np.clip(tp_model.predict(X_input[v4_features]), 0.003, 0.02)
+            sl_pred = np.clip(sl_model.predict(X_input[v4_features]), 0.00375, 0.0075)
+            
+            logger.info(f"v4 predictions: {(predictions==1).sum()} BUY, {(predictions==0).sum()} SELL, {(predictions==-1).sum()} HOLD")
+        else:
+            # Fallback to old model
+            raw_predictions = model.predict(X)
+            predictions = np.where(raw_predictions == 0, -1, np.where(raw_predictions == 1, 0, 1))
+            try:
+                proba = model.predict_proba(X)
+                probabilities = proba.max(axis=1)
+            except (AttributeError, IndexError):
+                probabilities = [0.5] * len(predictions)
+            tp_pred = [0.003] * len(predictions)
+            sl_pred = [0.003] * len(predictions)
         
         # Compute real SHAP values for the latest bar
         shap_values_for_response = [{'feature': 'N/A', 'contribution': 0.0}] * len(predictions)
@@ -665,8 +885,23 @@ def get_latest_predictions():
         # Prepare response
         results = []
         for i, (idx, row) in enumerate(recent_data.iterrows()):
-            # Use real SHAP for latest bar, placeholder for others
             bar_shap = shap_values_for_response[-1] if i == len(recent_data) - 1 else shap_values_for_response[0]
+            if isinstance(bar_shap, dict):
+                bar_shap = [bar_shap]
+            
+            price = float(row['close'])
+            signal = int(predictions[i])
+            
+            # Calculate TP/SL levels
+            if signal == 1:  # BUY
+                tp_level = price * (1 + tp_pred[i])
+                sl_level = price * (1 - sl_pred[i])
+            elif signal == 0:  # SELL
+                tp_level = price * (1 - tp_pred[i])
+                sl_level = price * (1 + sl_pred[i])
+            else:  # HOLD
+                tp_level = None
+                sl_level = None
             
             results.append({
                 'timestamp': idx.isoformat(),
@@ -674,11 +909,15 @@ def get_latest_predictions():
                 'open': float(row['open']),
                 'high': float(row['high']),
                 'low': float(row['low']),
-                'close': float(row['close']),
-                'price': float(row['close']), # FIXED: Expected by frontend (prediction.price)
-                'signal': int(predictions[i]),
+                'close': price,
+                'price': price,
+                'signal': signal,
                 'probability': float(probabilities[i]),
-                'confidence': float(probabilities[i]), # FIXED: Expected by frontend (prediction.confidence)
+                'confidence': float(probabilities[i]),
+                'tp_distance': round(float(tp_pred[i]) * 100, 3) if signal != -1 else None,
+                'sl_distance': round(float(sl_pred[i]) * 100, 3) if signal != -1 else None,
+                'tp_level': round(tp_level, 2) if tp_level else None,
+                'sl_level': round(sl_level, 2) if sl_level else None,
                 'shap_values': bar_shap
             })
         
@@ -690,8 +929,22 @@ def get_latest_predictions():
                 signal=latest['signal'],
                 confidence=latest['confidence'],
                 price=latest['price'],
-                shap_values=latest.get('shap_values', [])
+                shap_values=latest.get('shap_values', []),
+                tp_distance=latest.get('tp_distance'),
+                sl_distance=latest.get('sl_distance'),
             )
+            
+            # Create price alert if BUY/SELL with TP/SL
+            if latest['signal'] in (1, 0) and latest.get('tp_level') and latest.get('sl_level'):
+                from api.app.price_alerts import add_alert
+                add_alert(
+                    asset=asset,
+                    signal=latest['signal'],
+                    entry_price=latest['price'],
+                    tp_level=latest['tp_level'],
+                    sl_level=latest['sl_level'],
+                    confidence=latest['confidence'],
+                )
             
             # Send email alert if confidence > 70% and signal is BUY/SELL
             if email_alerts.should_alert(latest['signal'], latest['confidence']):
@@ -739,7 +992,7 @@ def get_latest_predictions():
                     else:
                         logger.info(f"Alert suppressed by agent: {agent.reason}")
         
-        return jsonify({
+        response_data = {
             'asset': asset,
             'predictions': results,
             'total_signals': int(predictions.sum()),
@@ -747,7 +1000,12 @@ def get_latest_predictions():
                 'start': recent_data.index.min().isoformat(),
                 'end': recent_data.index.max().isoformat()
             }
-        })
+        }
+        
+        # Cache response for 30 seconds
+        response_cache.set(resp_cache_key, response_data, ttl_seconds=30)
+        
+        return jsonify(response_data)
 
     except Exception as e:
         logger.error(f"Error getting predictions: {e}")
@@ -760,7 +1018,7 @@ def get_latest_predictions():
 @token_required
 @limiter.limit("60 per minute")  # FIXED: Add rate limiting
 def get_backtest_results(current_user_email):
-    """Get backtest results.
+    """Get backtest results (cached for 60s).
     
     Query params:
         asset: Asset to get backtest for (gold, silver, or latest, default: latest)
@@ -775,6 +1033,12 @@ def get_backtest_results(current_user_email):
                 'error': f'Invalid asset. Must be one of: {", ".join(ALLOWED_ASSETS)}'
             }), 400
         
+        # Check cache first
+        cache_key = f"backtest_{asset}"
+        cached = response_cache.get(cache_key)
+        if cached:
+            return jsonify(cached)
+        
         # FIXED: Use safe mapping instead of string concatenation
         asset_file_map = {
             'gold': 'gold_backtest.json',
@@ -787,7 +1051,7 @@ def get_backtest_results(current_user_email):
         results_file = project_root / 'reports' / 'backtest_results' / asset_file_map[asset]
         
         if not results_file.exists():
-            return jsonify({'error': f'No backtest results found for {asset}. Run backtest first.'}), 404
+            return jsonify([]), 200
         
         with open(results_file, 'r') as f:
             data = json.load(f)
@@ -795,7 +1059,13 @@ def get_backtest_results(current_user_email):
         # Add asset identifier to response
         data['asset'] = asset if asset in ['gold', 'silver'] else 'latest'
         
-        return jsonify(data)
+        # Frontend expects an array of results
+        result_list = [data]
+        
+        # Cache for 60 seconds
+        response_cache.set(cache_key, result_list, ttl_seconds=60)
+        
+        return jsonify(result_list)
     
     except Exception as e:
         logger.error(f"Error loading backtest results: {e}")
@@ -829,9 +1099,17 @@ def run_backtest(current_user_email):
 @app.route('/api/backtest/status', methods=['GET'])
 @token_required
 def get_backtest_status(current_user_email):
-    """Get current backtest execution status and progress."""
-    status = backtest_manager.get_status()
-    return jsonify(status), 200
+    """Backtest status with long-polling support.
+
+    Holds connection until progress changes or backtest completes.
+    """
+    from api.app.long_poll import long_poll, make_etag
+
+    def _check():
+        status = backtest_manager.get_status()
+        return make_etag(status), status
+
+    return long_poll(etag_key='backtest_status', check_fn=_check, timeout=30)
 
 
 @app.route('/api/shap/feature-importance', methods=['GET'])
@@ -997,11 +1275,179 @@ def manage_config(current_user_email):
             return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/cache/stats', methods=['GET'])
+@limiter.limit("10 per minute")
+def get_cache_stats():
+    """Get cache statistics for monitoring."""
+    with response_cache._lock:
+        cache_entries = len(response_cache._cache)
+        valid_entries = sum(
+            1 for _, (_, expiry) in response_cache._cache.items()
+            if datetime.now(timezone.utc) < expiry
+        )
+    
+    return jsonify({
+        'total_entries': cache_entries,
+        'valid_entries': valid_entries,
+        'expired_entries': cache_entries - valid_entries,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    })
+
+
+@app.route('/api/cache/clear', methods=['POST'])
+@limiter.limit("5 per minute")
+def clear_cache():
+    """Clear all cached responses."""
+    response_cache.clear()
+    prediction_cache.clear()
+    file_cache.clear()
+    return jsonify({'message': 'All caches cleared', 'timestamp': datetime.now(timezone.utc).isoformat()})
+
+
+@app.route('/api/circuit/status', methods=['GET'])
+@limiter.limit("10 per minute")
+def get_circuit_status():
+    """Get circuit breaker status for external services."""
+    return jsonify({
+        'mt5_price_cache': 'active' if MT5_CACHE_FILE.exists() else 'inactive',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    })
+
+
+@app.route('/api/risk/status', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_risk_status():
+    """Risk status with long-polling support."""
+    from api.app.long_poll import long_poll, make_etag
+    from api.app.risk_manager import risk_manager
+
+    def _check():
+        data = risk_manager.get_status()
+        return make_etag(data), data
+
+    return long_poll(etag_key='risk_status', check_fn=_check, timeout=30)
+
+
+@app.route('/api/risk/can-trade', methods=['GET'])
+@limiter.limit("30 per minute")
+def check_can_trade():
+    """Can-trade check with long-polling support."""
+    from api.app.long_poll import long_poll, make_etag
+    from api.app.risk_manager import risk_manager
+
+    def _check():
+        data = risk_manager.can_trade()
+        return make_etag(data), data
+
+    return long_poll(etag_key='risk_can_trade', check_fn=_check, timeout=30)
+
+
+@app.route('/api/risk/lot-size', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_lot_size():
+    """Calculate lot size for a given ATR and symbol.
+    Query params: atr (required), symbol (default: XAGUSD)
+    """
+    from api.app.risk_manager import risk_manager
+    try:
+        atr = float(request.args.get('atr', 0))
+        symbol = request.args.get('symbol', 'XAGUSD')
+        if atr <= 0:
+            return jsonify({'error': 'ATR must be > 0'}), 400
+        return jsonify(risk_manager.calculate_lot_size(atr, symbol))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid ATR value'}), 400
+
+
+@app.route('/api/risk/weekly', methods=['GET'])
+@limiter.limit("10 per minute")
+def get_weekly_stats():
+    """Get weekly performance stats."""
+    from api.app.risk_manager import risk_manager
+    return jsonify(risk_manager.get_weekly_stats())
+
+
+@app.route('/api/risk/log', methods=['POST'])
+@limiter.limit("60 per minute")
+def log_trade():
+    """Log a completed trade. Body: {signal, prob, entry, atr, pnl, sl_hit, tp_hit}"""
+    from api.app.risk_manager import risk_manager
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    required = ['signal', 'prob', 'entry', 'atr', 'pnl']
+    for field in required:
+        if field not in data:
+            return jsonify({'error': f'Missing field: {field}'}), 400
+
+    risk_manager.log_trade(
+        signal=data['signal'],
+        prob=float(data['prob']),
+        entry=float(data['entry']),
+        atr=float(data['atr']),
+        pnl=float(data['pnl']),
+        sl_hit=data.get('sl_hit', False),
+        tp_hit=data.get('tp_hit', False),
+    )
+    return jsonify({'message': 'Trade logged', 'status': risk_manager.get_status()})
+
+
+@app.before_request
+def handle_request_timeout():
+    """Track request start time for timeout detection."""
+    request._start_time = time.time()
+
+
+@app.after_request
+def handle_request_completion(response):
+    """Log slow requests and add timing header."""
+    if hasattr(request, '_start_time'):
+        duration = time.time() - request._start_time
+        response.headers['X-Response-Time'] = f"{duration:.3f}s"
+        if duration > 5.0:
+            logger.warning(f"Slow request: {request.path} took {duration:.2f}s")
+    return response
+
+
+@app.errorhandler(500)
+def handle_500(error):
+    """Handle internal server errors gracefully."""
+    logger.error(f"Internal server error: {str(error)}", exc_info=True)
+    return jsonify({
+        'error': 'Internal server error',
+        'message': 'The server encountered an unexpected condition',
+        'status_code': 500
+    }), 500
+
+
+@app.errorhandler(502)
+def handle_502(error):
+    """Handle bad gateway errors."""
+    logger.error(f"Bad gateway error: {str(error)}")
+    return jsonify({
+        'error': 'Bad gateway',
+        'message': 'The server received an invalid response from upstream',
+        'status_code': 502
+    }), 502
+
+
+@app.errorhandler(503)
+def handle_503(error):
+    """Handle service unavailable errors."""
+    logger.error(f"Service unavailable: {str(error)}")
+    return jsonify({
+        'error': 'Service unavailable',
+        'message': 'The server is temporarily unable to handle the request',
+        'status_code': 503
+    }), 503
+
+
 @app.route('/api/models/info', methods=['GET'])
 @token_required
 @limiter.limit("60 per minute")  # FIXED: Add rate limiting
 def get_model_info(current_user_email):
-    """Get model metadata and information.
+    """Get model metadata and information (cached for 5 min).
     
     Query params:
         asset: Asset to get model info for (gold or silver, default: gold)
@@ -1012,6 +1458,12 @@ def get_model_info(current_user_email):
         # Validate asset
         if asset not in ['gold', 'silver']:
             return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
+        
+        # Check cache first
+        cache_key = f"model_info_{asset}"
+        cached = response_cache.get(cache_key)
+        if cached:
+            return jsonify(cached)
         
         # FIXED: Use ModelManager for lazy loading
         model, feature_names = model_manager.get_or_load_model(asset)
@@ -1057,6 +1509,9 @@ def get_model_info(current_user_email):
             info['feature_names'] = feature_names[:50]  # Limit to first 50
             info['total_features'] = len(feature_names)
         
+        # Cache for 5 minutes
+        response_cache.set(cache_key, info, ttl_seconds=300)
+        
         return jsonify(info)
     
     except Exception as e:
@@ -1064,37 +1519,222 @@ def get_model_info(current_user_email):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/predictions/history', methods=['GET'])
+@limiter.limit("60 per minute")
+def get_prediction_history():
+    """Get historical signal predictions with outcomes.
+
+    Query params:
+        asset: gold | silver | all (default: all)
+        signal: buy | sell | hold | all (default: all)
+        days: number of days to look back (default: 7, max: 30)
+        page: page number (default: 1)
+        per_page: results per page (default: 50, max: 200)
+    """
+    try:
+        asset_filter = request.args.get('asset', 'all').lower()
+        signal_filter = request.args.get('signal', 'all').lower()
+        days = min(int(request.args.get('days', 7)), 30)
+        page = max(int(request.args.get('page', 1)), 1)
+        per_page = min(int(request.args.get('per_page', 50)), 200)
+
+        if asset_filter not in ('gold', 'silver', 'all'):
+            return jsonify({'error': 'Invalid asset filter'}), 400
+        if signal_filter not in ('buy', 'sell', 'all'):
+            return jsonify({'error': 'Invalid signal filter'}), 400
+
+        # Check outcomes for today's predictions before serving
+        try:
+            current_prices = {}
+            for a in ('gold', 'silver'):
+                mt5_data = fetch_mt5_price(a)
+                if mt5_data:
+                    current_prices[a] = mt5_data['ask']
+            if current_prices:
+                prediction_logger.check_outcomes(current_prices)
+        except Exception as e:
+            logger.warning(f"Outcome check failed: {e}")
+
+        predictions_dir = Path(__file__).parent.parent.parent / 'reports' / 'predictions'
+        if not predictions_dir.exists():
+            return jsonify({'predictions': [], 'summary': _empty_summary(), 'total': 0, 'page': page, 'per_page': per_page})
+
+        all_records = []
+        for i in range(days):
+            date_str = (datetime.now(timezone.utc) - timedelta(days=i)).strftime('%Y%m%d')
+            log_file = predictions_dir / f'predictions_{date_str}.jsonl'
+            if not log_file.exists():
+                continue
+            with open(log_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                        all_records.append(record)
+                    except json.JSONDecodeError:
+                        continue
+
+        # Apply filters
+        if asset_filter != 'all':
+            all_records = [r for r in all_records if r.get('asset') == asset_filter]
+        # Always exclude HOLD — only show actionable BUY/SELL signals
+        all_records = [r for r in all_records if r.get('signal') != 0]
+        if signal_filter != 'all':
+            signal_map = {'buy': 1, 'sell': -1}
+            target_signal = signal_map.get(signal_filter)
+            if target_signal is not None:
+                all_records = [r for r in all_records if r.get('signal') == target_signal]
+
+        # Sort newest first
+        all_records.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+
+        # Compute summary
+        summary = _compute_signal_summary(all_records)
+
+        # Paginate
+        total = len(all_records)
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_records = all_records[start:end]
+
+        return jsonify({
+            'predictions': page_records,
+            'summary': summary,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page,
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting prediction history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+def _empty_summary():
+    return {
+        'total': 0, 'buys': 0, 'sells': 0, 'holds': 0,
+        'wins': 0, 'losses': 0, 'win_rate': 0, 'avg_confidence': 0,
+        'avg_pnl': 0,
+    }
+
+
+def _compute_signal_summary(records):
+    total = len(records)
+    buys = sum(1 for r in records if r.get('signal') == 1)
+    sells = sum(1 for r in records if r.get('signal') == -1)
+    holds = total - buys - sells
+    wins = sum(1 for r in records if r.get('actual_outcome') and 'WIN' in r['actual_outcome'])
+    losses = sum(1 for r in records if r.get('actual_outcome') and 'LOSS' in r['actual_outcome'])
+    evaluated = wins + losses
+    win_rate = round(wins / evaluated * 100, 1) if evaluated > 0 else 0
+    avg_confidence = round(sum(r.get('confidence', 0) for r in records) / total, 4) if total > 0 else 0
+    pnls = [r['actual_pnl'] for r in records if r.get('actual_pnl') is not None]
+    avg_pnl = round(sum(pnls) / len(pnls), 2) if pnls else 0
+
+    return {
+        'total': total, 'buys': buys, 'sells': sells, 'holds': holds,
+        'wins': wins, 'losses': losses, 'win_rate': win_rate,
+        'avg_confidence': avg_confidence, 'avg_pnl': avg_pnl,
+    }
+
+
 # REMOVED: Flask UI serving routes - now using Next.js frontend
 # All UI routes removed to make Flask API-only
 
 def start_prediction_updates():
-    """Background thread to emit real-time prediction updates."""
+    """Background thread to emit real-time prediction + pipeline + price updates."""
     global thread_running
     thread_running = True
-    
-    logger.info("Starting real-time prediction updates thread")
-    
+
+    logger.info("Starting real-time updates thread")
+
     while thread_running:
         try:
-            # Generate predictions for both assets
+            if not connected_clients:
+                time.sleep(5)
+                continue
+
+            # --- Pipeline status (every 60s) ---
+            pipeline_subscribed = any(
+                c.get('subscriptions', {}).get('pipeline')
+                for c in connected_clients.values()
+            )
+            if pipeline_subscribed:
+                try:
+                    from api.app.pipeline_routes import _get_data_freshness_cached, _get_model_info_cached
+                    gold_f = _get_data_freshness_cached('gold')
+                    silver_f = _get_data_freshness_cached('silver')
+                    gold_m = _get_model_info_cached('gold')
+                    silver_m = _get_model_info_cached('silver')
+                    all_fresh = gold_f['is_fresh'] and silver_f['is_fresh']
+                    any_model = gold_m['exists'] or silver_m['exists']
+                    socketio.emit('pipeline_update', {
+                        'status': 'active' if all_fresh and any_model else 'degraded',
+                        'data_freshness': {'gold': gold_f, 'silver': silver_f},
+                        'models': {'gold': gold_m, 'silver': silver_m},
+                        'last_update': gold_f['last_date'] or silver_f['last_date'],
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                    })
+                except Exception as e:
+                    logger.error(f"Pipeline emit error: {e}")
+
+            # --- Live prices (every 15s) ---
             for asset in ['gold', 'silver']:
-                if not connected_clients:
-                    continue
-                    
-                # Check if any clients are subscribed to this asset
-                clients_subscribed = any(
-                    client_data.get('subscriptions', {}).get('predictions', {}).get(asset, False)
-                    for client_data in connected_clients.values()
+                price_subscribed = any(
+                    c.get('subscriptions', {}).get('price', {}).get(asset)
+                    for c in connected_clients.values()
                 )
-                
+                if not price_subscribed:
+                    continue
+                try:
+                    mt5_data = fetch_mt5_price(asset)
+                    if mt5_data:
+                        socketio.emit('price_update', {
+                            'asset': asset,
+                            'price': mt5_data['ask'],
+                            'timestamp': datetime.now(timezone.utc).isoformat(),
+                        })
+                except Exception as e:
+                    logger.error(f"Price emit error for {asset}: {e}")
+
+            # Check price alerts every cycle
+            try:
+                prices = {}
+                for asset in ['gold', 'silver']:
+                    mt5_data = fetch_mt5_price(asset)
+                    if mt5_data:
+                        prices[asset] = mt5_data['ask']
+                if prices:
+                    from api.app.price_alerts import check_alerts
+                    triggered = check_alerts(prices)
+                    for alert in triggered:
+                        socketio.emit('alert_triggered', {
+                            'id': alert['id'],
+                            'asset': alert['asset'],
+                            'signal': alert['signal'],
+                            'result': alert['result'],
+                            'entry': alert['entry'],
+                            'exit_price': alert.get('exit_price'),
+                            'pnl_pct': alert.get('pnl_pct'),
+                            'timestamp': datetime.now(timezone.utc).isoformat(),
+                        })
+            except Exception as e:
+                logger.error(f"Alert check error: {e}")
+
+            # --- Predictions (every 30s, existing logic) ---
+            for asset in ['gold', 'silver']:
+                clients_subscribed = any(
+                    c.get('subscriptions', {}).get('predictions', {}).get(asset, False)
+                    for c in connected_clients.values()
+                )
                 if not clients_subscribed:
                     continue
-                
-                # Generate fresh predictions
                 try:
                     prediction_data = generate_predictions_for_asset(asset)
                     if prediction_data:
-                        # Emit to all connected clients subscribed to this asset
                         socketio.emit('predictions', {
                             'asset': asset,
                             'predictions': prediction_data['predictions'],
@@ -1102,17 +1742,15 @@ def start_prediction_updates():
                             'timestamp': datetime.now(timezone.utc).isoformat(),
                             'price': prediction_data['current_price']
                         })
-                        logger.debug(f"Emitted {asset} predictions to {len(connected_clients)} clients")
                 except Exception as e:
-                    logger.error(f"Error generating predictions for {asset}: {e}")
-                    
+                    logger.error(f"Prediction emit error for {asset}: {e}")
+
         except Exception as e:
-            logger.error(f"Error in prediction updates thread: {e}")
-            
-        # Wait 30 seconds before next update
-        time.sleep(30)
-    
-    logger.info("Real-time prediction updates thread stopped")
+            logger.error(f"Error in updates thread: {e}")
+
+        time.sleep(15)
+
+    logger.info("Real-time updates thread stopped")
 
 
 def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
@@ -1157,9 +1795,12 @@ def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
             logger.warning(f"No valid feature columns for asset {asset}")
             return None
 
-        predictions = model.predict(X)
+        raw_predictions = model.predict(X)
+        # Remap from {0,1,2} -> {-1,0,1} (SELL,HOLD,BUY)
+        predictions = np.where(raw_predictions == 0, -1, np.where(raw_predictions == 1, 0, 1))
         try:
-            probabilities = model.predict_proba(X)[:, 1]
+            proba = model.predict_proba(X)
+            probabilities = proba.max(axis=1)
         except Exception:
             probabilities = [0.5] * len(predictions)
 
@@ -1184,19 +1825,6 @@ def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
         import traceback
         traceback.print_exc()
         return None
-
-
-@app.route('/api/pipeline/status', methods=['GET'])
-@limiter.limit("30 per minute")
-def get_pipeline_status():
-    """Get pipeline health, status, data freshness, and model backups."""
-    try:
-        from etl.orchestrator import PipelineOrchestrator
-        orch = PipelineOrchestrator()
-        return jsonify(orch.get_dashboard_data())
-    except Exception as e:
-        logger.error(f"Error getting pipeline status: {e}")
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/backtest/export', methods=['GET'])
@@ -1334,6 +1962,25 @@ def handle_subscribe_etl_status(data):
     """Subscribe to ETL pipeline status updates."""
     logger.info(f'Client subscribed to ETL status: {data}')
     emit('subscription_confirmed', {'type': 'etl_status'})
+
+@socketio.on('subscribe_pipeline')
+def handle_subscribe_pipeline():
+    """Subscribe to pipeline status updates."""
+    client_id = request.sid
+    if client_id in connected_clients:
+        connected_clients[client_id]['subscriptions']['pipeline'] = True
+        emit('subscription_confirmed', {'type': 'pipeline'})
+
+@socketio.on('subscribe_price')
+def handle_subscribe_price(data):
+    """Subscribe to live price updates."""
+    client_id = request.sid
+    asset = data.get('asset', 'gold') if isinstance(data, dict) else 'gold'
+    if client_id in connected_clients:
+        if 'price' not in connected_clients[client_id]['subscriptions']:
+            connected_clients[client_id]['subscriptions']['price'] = {}
+        connected_clients[client_id]['subscriptions']['price'][asset] = True
+        emit('subscription_confirmed', {'type': 'price', 'asset': asset})
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)

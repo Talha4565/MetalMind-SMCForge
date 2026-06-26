@@ -27,7 +27,9 @@ class PredictionLogger:
         confidence: float,
         price: float,
         shap_values: list = None,
-        model_version: str = None
+        model_version: str = None,
+        tp_distance: float = None,
+        sl_distance: float = None,
     ) -> dict:
         """
         Log a single prediction.
@@ -44,8 +46,10 @@ class PredictionLogger:
             'confidence': round(confidence, 4),
             'price': round(price, 2),
             'shap_values': shap_values[:5] if shap_values else [],
-            'model_version': model_version or 'latest',
-            'actual_outcome': None,  # Filled later when price moves
+            'model_version': model_version or 'v4',
+            'tp_distance': round(tp_distance, 4) if tp_distance is not None else None,
+            'sl_distance': round(sl_distance, 4) if sl_distance is not None else None,
+            'actual_outcome': None,
             'actual_pnl': None,
             'outcome_checked_at': None,
         }
@@ -54,7 +58,7 @@ class PredictionLogger:
         with open(self.current_file, 'a') as f:
             f.write(json.dumps(record) + '\n')
         
-        logger.info(f"Logged prediction: {signal_text} {asset} @ ${price:.2f} ({confidence:.1%})")
+        logger.info(f"Logged prediction: {signal_text} {asset} @ ${price:.2f} ({confidence:.1%}) TP={tp_distance} SL={sl_distance}")
         return record
     
     def log_batch(self, predictions: List[Dict[str, Any]]):
