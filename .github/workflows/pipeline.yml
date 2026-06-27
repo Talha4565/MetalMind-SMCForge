@@ -2,7 +2,6 @@ name: MetalMind Pipeline
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
     - cron: '0 3 * * *'
   workflow_dispatch:
 
@@ -14,45 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: pip install -r api/requirements.txt
-
-      - name: Update gold data
-        run: python run_pipeline.py --mode update --asset gold
-
-      - name: Update silver data
-        run: python run_pipeline.py --mode update --asset silver
-
-      - name: Check freshness
-        run: python run_pipeline.py --mode freshness
-
-      - name: Commit and push updated data
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add -f "Gold Dataset/" "Silver Dataset/"
-          git diff --staged --quiet && echo "No changes to commit" && exit 0
-          git commit -m "data: automated update $(date +'%Y-%m-%d %H:%M')"
-          git push origin main
-
   retrain-model:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event.schedule == '0 3 * * *'
 
     steps:
       - uses: actions/checkout@v4
@@ -66,19 +29,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r api/requirements.txt
 
-      - name: Update data before retrain
-        run: |
-          python run_pipeline.py --mode update --asset gold
-          python run_pipeline.py --mode update --asset silver
-
       - name: Retrain gold model
-        run: python run_pipeline.py --mode retrain --asset gold --trials 10
+        run: python -c "
+          from models.train_enhanced import EnhancedModelTrainer;
+          t = EnhancedModelTrainer(primary_tf='15m', asset='gold');
+          t.run_complete_pipeline(n_trials=10)
+        "
 
       - name: Retrain silver model
-        run: python run_pipeline.py --mode retrain --asset silver --trials 10
-
-      - name: Check pipeline status
-        run: python run_pipeline.py --mode status
+        run: python -c "
+          from models.train_enhanced import EnhancedModelTrainer;
+          t = EnhancedModelTrainer(primary_tf='15m', asset='silver');
+          t.run_complete_pipeline(n_trials=10)
+        "
 
       - name: Commit and push updated models
         run: |

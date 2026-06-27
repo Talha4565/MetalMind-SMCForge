@@ -1,0 +1,1 @@
+{"id": "gold_1782509656", "asset": "gold", "signal": "BUY", "entry": 4050.0, "tp": 4070.0, "sl": 4035.0, "confidence": 69.0, "created_at": "2026-06-26T21:34:16.995017+00:00", "status": "triggered", "hit_at": "2026-06-26T21:34:17.060782+00:00", "result": "WIN_TP", "exit_price": 4075.0, "pnl_pct": 0.62}
