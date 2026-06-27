@@ -2,8 +2,7 @@ name: MetalMind Pipeline
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
-    - cron: '0 3 * * *'
+    - cron: '0 3 * * *'  # Daily retrain only
   workflow_dispatch:
 
 permissions:
@@ -14,45 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: pip install -r api/requirements.txt
-
-      - name: Update gold data
-        run: python run_pipeline.py --mode update --asset gold
-
-      - name: Update silver data
-        run: python run_pipeline.py --mode update --asset silver
-
-      - name: Check freshness
-        run: python run_pipeline.py --mode freshness
-
-      - name: Commit and push updated data
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add -f "Gold Dataset/" "Silver Dataset/"
-          git diff --staged --quiet && echo "No changes to commit" && exit 0
-          git commit -m "data: automated update $(date +'%Y-%m-%d %H:%M')"
-          git push origin main
-
   retrain-model:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event.schedule == '0 3 * * *'
+    if: github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
@@ -66,19 +30,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r api/requirements.txt
 
-      - name: Update data before retrain
+      - name: Note about MT5
         run: |
-          python run_pipeline.py --mode update --asset gold
-          python run_pipeline.py --mode update --asset silver
+          echo "Note: Data updates require MT5 running locally."
+          echo "GitHub Actions only handles model retraining."
+          echo "Run 'python scripts/mt5_update.py' locally to update data."
+
+      - name: Check data freshness
+        run: python run_pipeline.py --mode freshness
 
       - name: Retrain gold model
         run: python run_pipeline.py --mode retrain --asset gold --trials 10
 
       - name: Retrain silver model
         run: python run_pipeline.py --mode retrain --asset silver --trials 10
-
-      - name: Check pipeline status
-        run: python run_pipeline.py --mode status
 
       - name: Commit and push updated models
         run: |
