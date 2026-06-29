@@ -2,7 +2,23 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
+
+/**
+ * Syncs NextAuth session token with api-client (memory-only, never localStorage).
+ */
+export function useAuthSync() {
+  const { data: session, status } = useSession();
+
+  useEffect(() => {
+    if (status === 'authenticated' && (session as any)?.user?.accessToken) {
+      apiClient.setAccessToken((session as any).user.accessToken);
+    } else if (status === 'unauthenticated') {
+      apiClient.clearAuth();
+    }
+  }, [session, status]);
+}
 
 /**
  * Hook for handling logout using NextAuth.
@@ -22,7 +38,7 @@ export function useLogout() {
  */
 export function useCurrentUser() {
   const { data: session, status } = useSession();
-  
+
   return {
     user: session?.user,
     isLoading: status === 'loading',

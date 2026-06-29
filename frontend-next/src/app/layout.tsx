@@ -32,7 +32,10 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         <Providers>
-          <main className="min-h-screen">{children}</main>
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
+          <main id="main-content" className="min-h-screen">{children}</main>
           <Toaster position="top-right" richColors />
         </Providers>
       </body>

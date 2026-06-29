@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -88,7 +88,7 @@ export default function LoginPage() {
             <h1 className="text-3xl font-black tracking-tight text-card-foreground">
               Welcome back
             </h1>
-            <p className="text-sm text-slate-500 mt-2">
+            <p className="text-sm text-slate-400 mt-2">
               Sign in to access your trading signals and analytics.
             </p>
           </div>
@@ -100,7 +100,7 @@ export default function LoginPage() {
             showOtp={requires2fa}
           />
 
-          <p className="text-xs text-slate-600 text-center">
+          <p className="text-xs text-slate-400 text-center">
             Don&apos;t have an account?{' '}
             <Link href="/auth/register" className="text-emerald-400 hover:text-emerald-300 font-medium">
               Create one
@@ -115,7 +115,7 @@ export default function LoginPage() {
 
           <div className="relative space-y-6">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-accent/30 w-fit">
-              <Zap className="w-3 h-3 text-emerald-400" />
+              <Zap className="w-3 h-3 text-emerald-400" aria-hidden="true" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
                 AI-powered signals
               </span>
@@ -127,7 +127,7 @@ export default function LoginPage() {
               <span className="text-emerald-400">machine precision</span>
             </h2>
 
-            <p className="text-sm text-slate-500 leading-relaxed">
+            <p className="text-sm text-slate-300 leading-relaxed">
               XGBoost models trained on 20 years of tick data.
               SHAP explainability on every prediction.
             </p>
@@ -137,19 +137,19 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-6">
             <div>
               <p className="text-3xl font-black font-mono text-card-foreground">XAU</p>
-              <p className="text-[10px] uppercase tracking-widest text-emerald-500 mt-1">Gold</p>
+              <p className="text-[10px] uppercase tracking-widest text-emerald-400 mt-1">Gold</p>
             </div>
             <div>
               <p className="text-3xl font-black font-mono text-card-foreground">XAG</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">Silver</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Silver</p>
             </div>
             <div>
               <p className="text-3xl font-black font-mono text-emerald-400">90</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">Features</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Features</p>
             </div>
             <div>
               <p className="text-3xl font-black font-mono text-emerald-400">86%</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 mt-1">Accuracy</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Accuracy</p>
             </div>
           </div>
         </div>

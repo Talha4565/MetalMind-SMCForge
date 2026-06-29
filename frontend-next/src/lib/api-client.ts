@@ -17,10 +17,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 class ApiClient {
   private client: AxiosInstance;
-  private token: string | null = null;
-  private refreshTokenValue: string | null = null;
-  private isRefreshing = false;
-  private failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+  private accessToken: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -28,22 +25,15 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      // Timeout after 10 seconds
       timeout: 10000,
+      withCredentials: true,
     });
 
-    // Initialize in-memory token from localStorage for reloads.
-    const savedToken = this.getToken();
-    if (savedToken) {
-      this.token = savedToken;
-    }
-
-    // Request Interceptor: Attach JWT token
+    // Request Interceptor: Attach JWT from memory only (never localStorage)
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = this.getToken();
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
+        if (this.accessToken && config.headers) {
+          config.headers.Authorization = `Bearer ${this.accessToken}`;
         }
         return config;
       },
@@ -55,22 +45,12 @@ class ApiClient {
       (response) => response,
       async (error) => {
         if (error.response) {
-          // Handle 401 with token refresh attempt
+          // Handle 401 — clear auth and redirect to login
           if (error.response.status === 401 && !error.config._retry) {
-            const refreshTok = this.getRefreshToken();
-            if (refreshTok && !this.isRefreshing) {
-              error.config._retry = true;
-              try {
-                const newToken = await this.refreshAccessToken();
-                if (newToken) {
-                  error.config.headers.Authorization = `Bearer ${newToken}`;
-                  return this.client.request(error.config);
-                }
-              } catch {
-                // Refresh failed, fall through to clearAuth
-              }
-            }
             this.clearAuth();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/auth/login';
+            }
           }
           
           // Format the error for easier consumption
@@ -93,82 +73,14 @@ class ApiClient {
     );
   }
 
-  // --- Auth Management ---
+  // --- Auth Management (memory-only, never localStorage) ---
 
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-    }
-  }
-
-  getToken(): string | null {
-    if (this.token) return this.token;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('auth_token');
-    }
-    return null;
+  setAccessToken(token: string) {
+    this.accessToken = token;
   }
 
   clearAuth() {
-    this.token = null;
-    this.refreshTokenValue = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-    }
-  }
-
-  setRefreshToken(token: string) {
-    this.refreshTokenValue = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('refresh_token', token);
-    }
-  }
-
-  getRefreshToken(): string | null {
-    if (this.refreshTokenValue) return this.refreshTokenValue;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refresh_token');
-    }
-    return null;
-  }
-
-  private async refreshAccessToken(): Promise<string | null> {
-    if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
-        this.failedQueue.push({ resolve, reject });
-      });
-    }
-
-    this.isRefreshing = true;
-    const refreshTok = this.getRefreshToken();
-
-    if (!refreshTok) {
-      this.isRefreshing = false;
-      return null;
-    }
-
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-        refresh_token: refreshTok,
-      });
-
-      const newToken = response.data.access_token;
-      if (newToken) {
-        this.setToken(newToken);
-        this.failedQueue.forEach(({ resolve }) => resolve(newToken));
-        this.failedQueue = [];
-        return newToken;
-      }
-      return null;
-    } catch {
-      this.failedQueue.forEach(({ reject }) => reject(new Error('Refresh failed')));
-      this.failedQueue = [];
-      return null;
-    } finally {
-      this.isRefreshing = false;
-    }
+    this.accessToken = null;
   }
 
   // --- API Endpoints ---
@@ -177,10 +89,7 @@ class ApiClient {
   async login(payload: LoginPayload): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/api/auth/login', payload);
     if (response.data.token) {
-      this.setToken(response.data.token);
-    }
-    if ((response.data as any).refreshToken) {
-      this.setRefreshToken((response.data as any).refreshToken);
+      this.setAccessToken(response.data.token);
     }
     return response.data;
   }

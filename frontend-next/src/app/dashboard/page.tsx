@@ -107,6 +107,8 @@ export default function DashboardPage() {
             <button
               key={asset}
               onClick={() => setActiveAsset(asset)}
+              aria-label={`Switch to ${asset === 'gold' ? 'Gold XAU/USD' : 'Silver XAG/USD'}`}
+              aria-pressed={activeAsset === asset}
               className={cn(
                 'px-3 py-1 text-[10px] font-mono font-bold tracking-[0.2em] uppercase transition-all border-b-2',
                 activeAsset === asset
@@ -132,7 +134,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className={cn('px-2 py-0.5 border font-mono font-black text-[11px] tracking-widest', {
+          <div role="status" aria-live="polite" aria-label={`Current signal: ${signalText}`} className={cn('px-2 py-0.5 border font-mono font-black text-[11px] tracking-widest', {
             'border-terminal-buy/40 text-terminal-buy bg-terminal-buy/5': signalText === 'BUY',
             'border-terminal-sell/40 text-terminal-sell bg-terminal-sell/5': signalText === 'SELL',
             'border-terminal-hold/40 text-terminal-hold bg-terminal-hold/5': signalText === 'HOLD',
@@ -151,6 +153,7 @@ export default function DashboardPage() {
 
           <button
             onClick={() => refetch()}
+            aria-label="Refresh trading signals"
             className={cn(
               'p-1 text-terminal-label hover:text-terminal-hold transition-all',
               isRefetching && 'animate-spin text-terminal-hold'

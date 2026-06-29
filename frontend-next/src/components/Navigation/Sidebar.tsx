@@ -40,6 +40,8 @@ export default function Sidebar() {
         </div>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={mobileOpen}
           className="p-1.5 text-terminal-label hover:text-terminal-value transition-colors"
         >
           {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -59,7 +61,7 @@ export default function Sidebar() {
                   <p className="text-[8px] text-terminal-label font-mono tracking-[0.25em]">SMCFORGE v1</p>
                 </div>
               </div>
-              <button onClick={() => setMobileOpen(false)} className="text-terminal-label hover:text-terminal-value">
+              <button onClick={() => setMobileOpen(false)} aria-label="Close navigation menu" className="text-terminal-label hover:text-terminal-value">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
