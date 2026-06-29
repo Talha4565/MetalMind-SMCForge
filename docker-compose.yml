@@ -16,7 +16,6 @@ services:
       - FLASK_ENV=development
       - FLASK_APP=api/app/main.py
     volumes:
-      # Mount only source code — packages stay in image
       - ./api:/app/api
       - ./config:/app/config
       - ./etl:/app/etl
@@ -29,6 +28,8 @@ services:
       - ./models:/app/models
       - ./reports:/app/reports
       - ./scripts:/app/scripts
+      - "./Gold Dataset:/app/Gold Dataset"
+      - "./Silver Dataset:/app/Silver Dataset"
       - ./start_api.py:/app/start_api.py
       - ./run_pipeline.py:/app/run_pipeline.py
       - instance_data:/app/instance
@@ -129,6 +130,8 @@ services:
       - ./models:/app/models
       - ./reports:/app/reports
       - ./scripts:/app/scripts
+      - "./Gold Dataset:/app/Gold Dataset"
+      - "./Silver Dataset:/app/Silver Dataset"
       - ./start_api.py:/app/start_api.py
       - ./run_pipeline.py:/app/run_pipeline.py
       - instance_data:/app/instance
