@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache/api
     container_name: metalmind-api
     ports:
       - "5000:5000"
@@ -14,12 +16,25 @@ services:
       - FLASK_ENV=development
       - FLASK_APP=api/app/main.py
     volumes:
-      - ./:/app                     # mount full project for hot reload
-      - /app/__pycache__            # prevent cache conflicts
+      # Mount only source code — packages stay in image
+      - ./api:/app/api
+      - ./config:/app/config
+      - ./etl:/app/etl
+      - ./explainability:/app/explainability
+      - ./features:/app/features
+      - ./backtesting:/app/backtesting
+      - ./signal_memory:/app/signal_memory
+      - ./self_learning:/app/self_learning
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+      - ./scripts:/app/scripts
+      - ./start_api.py:/app/start_api.py
+      - ./run_pipeline.py:/app/run_pipeline.py
+      - instance_data:/app/instance
+      - /app/__pycache__
       - /app/.pytest_cache
-    # Clear the image ENTRYPOINT (the host mount hides the file copied into the image)
     entrypoint: []
-    # Use sh -c to run migrations then start the socketio-backed server
     command: >
       sh -c "
         cd /app && \
@@ -68,6 +83,8 @@ services:
     build:
       context: ./frontend-next
       dockerfile: Dockerfile
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache/frontend
     container_name: metalmind-frontend
     ports:
       - "3000:3000"
@@ -79,9 +96,12 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
     volumes:
-      - ./frontend-next:/app        # hot reload: code changes reflect instantly
-      - /app/node_modules           # prevents conflicts with local node_modules
-      - next_cache:/app/.next       # use named volume for .next cache to avoid permission issues
+      - ./frontend-next/src:/app/src
+      - ./frontend-next/public:/app/public
+      - ./frontend-next/next.config.ts:/app/next.config.ts
+      - ./frontend-next/package.json:/app/package.json
+      - node_modules:/app/node_modules
+      - next_cache:/app/.next
     command: npm run dev
     depends_on:
       api:
@@ -92,13 +112,30 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+      cache_from:
+        - type=local,src=/tmp/.buildx-cache/api
     container_name: metalmind-etl
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
     volumes:
-      - ./:/app
+      # Mount only source code — packages stay in image
+      - ./api:/app/api
+      - ./config:/app/config
+      - ./etl:/app/etl
+      - ./explainability:/app/explainability
+      - ./features:/app/features
+      - ./backtesting:/app/backtesting
+      - ./signal_memory:/app/signal_memory
+      - ./self_learning:/app/self_learning
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+      - ./scripts:/app/scripts
+      - ./start_api.py:/app/start_api.py
+      - ./run_pipeline.py:/app/run_pipeline.py
+      - instance_data:/app/instance
       - /app/__pycache__
     entrypoint: []
     command: >
@@ -116,3 +153,4 @@ volumes:
   instance_data:
   db_data:
   next_cache:
+  node_modules:
