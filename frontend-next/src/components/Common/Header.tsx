@@ -130,11 +130,11 @@ export default function Header() {
               align="end"
               className="w-44 bg-sidebar border border-terminal-rule rounded-none shadow-xl shadow-black/50 p-0"
             >
-              <DropdownMenuLabel className="px-3 py-2 border-b border-terminal-rule">
-                <p className="text-[9px] font-mono text-terminal-label tracking-widest">SIGNED IN AS</p>
-                <p className="text-[10px] font-mono font-bold text-terminal-value truncate mt-0.5">{session?.user?.email}</p>
-              </DropdownMenuLabel>
               <DropdownMenuGroup className="py-1">
+                <DropdownMenuLabel className="px-3 py-2 border-b border-terminal-rule">
+                  <p className="text-[9px] font-mono text-terminal-label tracking-widest">SIGNED IN AS</p>
+                  <p className="text-[10px] font-mono font-bold text-terminal-value truncate mt-0.5">{session?.user?.email}</p>
+                </DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() => router.push('/dashboard/profile')}
                   className="px-3 py-2 text-[10px] font-mono text-terminal-label hover:text-terminal-value hover:bg-terminal-rule cursor-pointer rounded-none"
