@@ -32,6 +32,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next-env.d.ts ./next-env.d.ts
+
+# Ensure the nextjs user owns the working directory
+RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
