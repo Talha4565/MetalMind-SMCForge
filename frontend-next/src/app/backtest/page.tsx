@@ -250,7 +250,7 @@ export default function BacktestPage() {
                   <TableBody>
                     {historyLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-8">Loading history...</TableCell></TableRow>
-                    ) : history && history.length > 0 ? (
+                    ) : history && Array.isArray(history) && history.length > 0 ? (
                       history.map((result, i) => (
                         <TableRow key={i} className="border-border hover:bg-accent/50 transition-colors">
                           <TableCell className="font-bold text-foreground">XAUUSD</TableCell>
