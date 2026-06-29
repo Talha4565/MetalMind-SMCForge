@@ -9,17 +9,11 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from etl.pipeline import ETLPipeline, PipelineResult, PipelineStatus
-from etl.extractors.base import BaseExtractor
-from etl.transformers.base import BaseTransformer
-from etl.loaders.base import BaseLoader
 
-
-class MockExtractor(BaseExtractor):
+class MockExtractor:
     """Mock extractor for testing."""
 
     def __init__(self, data=None):
-        super().__init__()
         self._data = data if data is not None else pd.DataFrame({
             'open': [1, 2, 3],
             'high': [2, 3, 4],
@@ -35,11 +29,10 @@ class MockExtractor(BaseExtractor):
         return isinstance(data, pd.DataFrame) and len(data) > 0
 
 
-class MockTransformer(BaseTransformer):
+class MockTransformer:
     """Mock transformer that adds a column."""
 
     def __init__(self, col_name='transformed'):
-        super().__init__()
         self.col_name = col_name
 
     def transform(self, data):
@@ -48,18 +41,17 @@ class MockTransformer(BaseTransformer):
         return data
 
 
-class MockFailingTransformer(BaseTransformer):
+class MockFailingTransformer:
     """Transformer that raises an error."""
 
     def transform(self, data):
         raise ValueError("Transform failed intentionally")
 
 
-class MockLoader(BaseLoader):
+class MockLoader:
     """Mock loader that records loaded data."""
 
     def __init__(self):
-        super().__init__()
         self.loaded_data = None
 
     def load(self, data):
@@ -67,7 +59,7 @@ class MockLoader(BaseLoader):
         return True
 
 
-class MockFailingLoader(BaseLoader):
+class MockFailingLoader:
     """Loader that returns False."""
 
     def load(self, data):
@@ -82,7 +74,8 @@ class TestETLPipelineIntegration:
         from etl.guards.data_quality_gate import DataQualityGate
         return DataQualityGate(config={"min_rows_required": 0, "max_price_change_pct": 999})
 
-    def test_successful_pipeline(self):
+    def test_successful_pipeline(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         transformers = [MockTransformer('col_a'), MockTransformer('col_b')]
         loaders = [MockLoader()]
@@ -100,7 +93,8 @@ class TestETLPipelineIntegration:
         assert result.records_processed == 3
         assert result.stage_results['transform_1']['success'] is True
 
-    def test_pipeline_failed_transformer(self):
+    def test_pipeline_failed_transformer(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         transformers = [MockFailingTransformer()]
         loaders = [MockLoader()]
@@ -117,7 +111,8 @@ class TestETLPipelineIntegration:
         assert result.status == PipelineStatus.FAILED
         assert result.error is not None
 
-    def test_pipeline_failed_loader(self):
+    def test_pipeline_failed_loader(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         transformers = [MockTransformer()]
         loaders = [MockFailingLoader()]
@@ -133,7 +128,8 @@ class TestETLPipelineIntegration:
         result = pipeline.run()
         assert result.status == PipelineStatus.FAILED
 
-    def test_pipeline_status_tracking(self):
+    def test_pipeline_status_tracking(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         pipeline = ETLPipeline(
             name='Status Pipeline',
@@ -152,7 +148,8 @@ class TestETLPipelineIntegration:
         assert status['status'] == 'success'
         assert status['run_count'] == 1
 
-    def test_pipeline_metrics(self):
+    def test_pipeline_metrics(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         pipeline = ETLPipeline(
             name='Metrics Pipeline',
@@ -167,7 +164,8 @@ class TestETLPipelineIntegration:
         assert 'extracted_rows' in metrics['metrics']
         assert 'transformed_rows' in metrics['metrics']
 
-    def test_pipeline_run_count_increments(self):
+    def test_pipeline_run_count_increments(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         pipeline = ETLPipeline(
             name='Count Pipeline',
@@ -180,7 +178,8 @@ class TestETLPipelineIntegration:
         pipeline.run()
         assert pipeline.run_count == 2
 
-    def test_pipeline_result_has_timestamps(self):
+    def test_pipeline_result_has_timestamps(self, etl_pipeline):
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         extractor = MockExtractor()
         pipeline = ETLPipeline(
             name='Timestamp Pipeline',
@@ -194,8 +193,9 @@ class TestETLPipelineIntegration:
         assert result.completed_at is not None
         assert result.completed_at >= result.started_at
 
-    def test_pipeline_skipped_by_data_quality_gate(self):
+    def test_pipeline_skipped_by_data_quality_gate(self, etl_pipeline):
         """When the gate says should_continue=False, the run returns SKIPPED early."""
+        ETLPipeline, PipelineResult, PipelineStatus = etl_pipeline
         from etl.guards.data_quality_gate import ValidationResult
 
         class BlockingGate:
@@ -215,6 +215,5 @@ class TestETLPipelineIntegration:
         )
         result = pipeline.run()
         assert result.status == PipelineStatus.SKIPPED
-        # Transformers/loaders must NOT have run
         assert "transform_1" not in result.stage_results
         assert "data_quality_gate" in result.stage_results

@@ -7,13 +7,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from backtesting.engine import BacktestEngine, Trade
-
 
 class TestTradeDataclass:
     """Test Trade dataclass."""
 
-    def test_trade_creation(self):
+    def test_trade_creation(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         trade = Trade(
             entry_time=pd.Timestamp('2024-01-01 08:00'),
             entry_price=2000.0,
@@ -35,18 +34,21 @@ class TestTradeDataclass:
 class TestBacktestEngine:
     """Test backtesting engine."""
 
-    def test_engine_initialization_gold(self):
+    def test_engine_initialization_gold(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         assert engine.asset == 'gold'
         assert engine.initial_capital > 0
         assert engine.tp_pct > 0
         assert engine.sl_pct > 0
 
-    def test_engine_initialization_silver(self):
+    def test_engine_initialization_silver(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='silver')
         assert engine.asset == 'silver'
 
-    def test_engine_custom_params(self):
+    def test_engine_custom_params(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(
             initial_capital=5000,
             risk_per_trade=10,
@@ -56,12 +58,14 @@ class TestBacktestEngine:
         assert engine.initial_capital == 5000
         assert engine.risk_per_trade == 10
 
-    def test_simulate_trade_no_signal(self, small_ohlcv_df):
+    def test_simulate_trade_no_signal(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         trade = engine.simulate_trade(0, small_ohlcv_df, signal=0)
         assert trade is None
 
-    def test_simulate_trade_at_end_of_data(self):
+    def test_simulate_trade_at_end_of_data(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         n = 10
         dates = pd.date_range('2024-01-01', periods=n, freq='15min')
         df = pd.DataFrame({
@@ -75,11 +79,12 @@ class TestBacktestEngine:
         trade = engine.simulate_trade(n - 1, df, signal=1)
         assert trade is None
 
-    def test_simulate_trade_tp_hit(self):
+    def test_simulate_trade_tp_hit(self, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         n = 20
         dates = pd.date_range('2024-01-01', periods=n, freq='15min')
         close = np.full(n, 2000.0)
-        close[3] = 2020.0  # Big move up that hits TP
+        close[3] = 2020.0
         df = pd.DataFrame({
             'open': close - 1,
             'high': close + 10,
@@ -92,13 +97,15 @@ class TestBacktestEngine:
         if trade is not None:
             assert trade.hit_tp is True or trade.hit_sl is True or trade.pnl_pct != 0
 
-    def test_run_backtest_empty_signals(self, small_ohlcv_df):
+    def test_run_backtest_empty_signals(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         results = engine.run_backtest(small_ohlcv_df, signals)
         assert results['metrics'] == {} or results['metrics'].get('n_trades', 0) == 0
 
-    def test_run_backtest_with_signals(self, small_ohlcv_df):
+    def test_run_backtest_with_signals(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         signals[10] = 1
@@ -108,13 +115,15 @@ class TestBacktestEngine:
         assert 'trades' in results
         assert 'equity_curve' in results
 
-    def test_equity_curve_starts_at_initial_capital(self, small_ohlcv_df):
+    def test_equity_curve_starts_at_initial_capital(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold', initial_capital=1000)
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         results = engine.run_backtest(small_ohlcv_df, signals)
         assert results['equity_curve'][0] == 1000
 
-    def test_metrics_structure(self, small_ohlcv_df):
+    def test_metrics_structure(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         signals[10] = 1
@@ -129,7 +138,8 @@ class TestBacktestEngine:
             assert 'max_drawdown_pct' in metrics
             assert 'sharpe_ratio' in metrics
 
-    def test_win_rate_between_0_and_1(self, small_ohlcv_df):
+    def test_win_rate_between_0_and_1(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         signals[10] = 1
@@ -139,7 +149,8 @@ class TestBacktestEngine:
             wr = results['metrics']['win_rate']
             assert 0 <= wr <= 1
 
-    def test_session_performance(self, small_ohlcv_df):
+    def test_session_performance(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.zeros(len(small_ohlcv_df), dtype=int)
         signals[10] = 1
@@ -149,7 +160,8 @@ class TestBacktestEngine:
         for session in ['Asian', 'London', 'NY']:
             assert session in sp
 
-    def test_many_signals(self, small_ohlcv_df):
+    def test_many_signals(self, small_ohlcv_df, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         engine = BacktestEngine(asset='gold')
         signals = np.ones(len(small_ohlcv_df), dtype=int)
         results = engine.run_backtest(small_ohlcv_df, signals)

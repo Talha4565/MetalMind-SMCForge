@@ -4,17 +4,12 @@ from pathlib import Path
 import pytest
 import pandas as pd
 import numpy as np
-import xgboost as xgb
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from features.pipeline import engineer_all_features
-from features.labels import generate_labels
-from backtesting.engine import BacktestEngine
-
 
 @pytest.fixture
-def engineered_data():
+def engineered_data(engineer_all_features):
     """Generate synthetic OHLCV and run through feature pipeline."""
     np.random.seed(42)
     n = 500
@@ -43,7 +38,7 @@ class TestFeatureToModelPipeline:
     def test_no_nans_in_features(self, engineered_data):
         assert engineered_data.isna().sum().sum() == 0
 
-    def test_train_xgboost_model(self, engineered_data):
+    def test_train_xgboost_model(self, engineered_data, xgb):
         X = engineered_data.drop(columns=['target'])
         y = engineered_data['target']
         split = int(len(X) * 0.8)
@@ -60,7 +55,7 @@ class TestFeatureToModelPipeline:
         assert len(predictions) == len(X_test)
         assert set(predictions).issubset({0, 1})
 
-    def test_model_has_predict_proba(self, engineered_data):
+    def test_model_has_predict_proba(self, engineered_data, xgb):
         X = engineered_data.drop(columns=['target'])
         y = engineered_data['target']
         split = int(len(X) * 0.8)
@@ -73,7 +68,8 @@ class TestFeatureToModelPipeline:
         assert proba.shape[1] == 2
         assert (proba >= 0).all() and (proba <= 1).all()
 
-    def test_backtest_with_model_signals(self, engineered_data):
+    def test_backtest_with_model_signals(self, engineered_data, xgb, backtest_engine):
+        BacktestEngine, Trade = backtest_engine
         X = engineered_data.drop(columns=['target'])
         y = engineered_data['target']
         split = int(len(X) * 0.8)

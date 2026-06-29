@@ -34,6 +34,26 @@ except ImportError:
 # Load environment variables from .env if present
 load_dotenv()
 
+
+def _validate_secrets():
+    """Reject startup if critical secrets are still placeholder values."""
+    placeholders = {
+        'SECRET_KEY': {'your-flask-secret-key-here', 'replace-with-a-strong-random-secret-key', ''},
+        'JWT_SECRET_KEY': {'replace-with-a-strong-random-jwt-key', ''},
+        'REFRESH_SECRET_KEY': {'replace-with-a-strong-random-refresh-key', ''},
+    }
+    errors = []
+    for key, bad_values in placeholders.items():
+        val = os.environ.get(key, '')
+        if val in bad_values:
+            errors.append(f"  {key} is set to a placeholder — generate a real value")
+    if errors:
+        logger.critical("SECRET VALIDATION FAILED — refusing to start:\n" + "\n".join(errors))
+        sys.exit(1)
+
+
+_validate_secrets()
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -57,6 +77,9 @@ app = Flask(__name__)
 
 # WSGI middleware: handle CORS for ALL paths including /socket.io
 ALLOWED_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
+_extra_origins = os.environ.get('CORS_ORIGINS', '')
+if _extra_origins:
+    ALLOWED_ORIGINS.update(o.strip() for o in _extra_origins.split(',') if o.strip())
 
 class CORSProxy:
     """Wraps every response with CORS headers — sits above engine.io."""
@@ -129,11 +152,10 @@ register_error_handlers(app)
 def set_security_headers(response):
     """Add security headers and CORS to every response."""
     origin = request.headers.get('Origin', '')
-    allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
     
     # CORS for API routes
     if request.path.startswith('/api') or request.path.startswith('/auth'):
-        if origin in allowed_origins:
+        if origin in ALLOWED_ORIGINS:
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'

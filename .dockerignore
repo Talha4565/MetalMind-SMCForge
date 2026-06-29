@@ -1,57 +1,23 @@
-# Root Docker build context ignore rules
-
-# OS and editor files
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Version control
+node_modules
+frontend-next/node_modules
+frontend-next/.next
 .git
-.gitignore
-
-# Python artifacts
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.env
-*.env.*
+.env
+.env.local
+.env.production
+api/.env
 *.db
-*.sqlite
-*.sqlite3
-*.log
-venv/
-ENV/
-env/
-.build/
-
-# Build artifacts and temporary files
-build/
-dist/
-*.egg-info/
-.pytest_cache/
-
-# Docker build and runtime
-Dockerfile
-.dockerignore
-
-# Large dataset and generated folders
-Gold Dataset/
-Silver Dataset/
-data/
-models/
-reports/
-logs/
 instance/
-
-# Node and frontend artifacts
-**/node_modules/
-**/.next/
-**/out/
-**/dist/
-**/npm-debug.log
-**/yarn-error.log
-**/pnpm-debug.log
+api/instance/
+__pycache__
+*.pyc
+.vscode
+.idea
+.DS_Store
+reports/shap_plots/*.png
+reports/backtest_results/*.json
+tmp_*
+temp_*
+miscellaneous_archive
+audit_reports
+test-screenshots
