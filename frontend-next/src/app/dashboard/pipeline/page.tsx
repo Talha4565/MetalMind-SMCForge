@@ -93,11 +93,11 @@ export default function PipelinePage() {
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "w-3 h-3 rounded-full",
-                  details.health.status === 'healthy' ? "bg-green-500 animate-pulse" : "bg-yellow-500"
+                  details?.health?.status === 'healthy' ? "bg-green-500 animate-pulse" : "bg-yellow-500"
                 )} />
                 <div>
-                  <p className="text-sm font-bold text-card-foreground">System Health: {details.health.status}</p>
-                  <p className="text-[10px] text-muted-foreground">Uptime: {details.health.uptime}</p>
+                  <p className="text-sm font-bold text-card-foreground">System Health: {details?.health?.status ?? 'unknown'}</p>
+                  <p className="text-[10px] text-muted-foreground">Uptime: {details?.health?.uptime ?? '--'}</p>
                 </div>
               </div>
               <Button variant="outline" size="sm" onClick={fetchDetails} className="border-border">
@@ -109,7 +109,7 @@ export default function PipelinePage() {
 
         {/* Pipeline Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.entries(details.pipelines).map(([key, pipeline]) => (
+          {details?.pipelines && Object.entries(details.pipelines).map(([key, pipeline]) => (
             <Card key={key} className="bg-card border-border">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -141,7 +141,8 @@ export default function PipelinePage() {
         {/* Data Freshness */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {['gold', 'silver'].map(asset => {
-            const data = details.data[asset as keyof typeof details.data];
+            const data = details?.data?.[asset as keyof typeof details.data];
+            if (!data) return null;
             return (
               <Card key={asset} className="bg-card border-border">
                 <CardHeader className="pb-3">
@@ -193,7 +194,8 @@ export default function PipelinePage() {
         {/* Model Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {['gold', 'silver'].map(asset => {
-            const model = details.models[asset as keyof typeof details.models];
+            const model = details?.models?.[asset as keyof typeof details.models];
+            if (!model) return null;
             return (
               <Card key={asset} className="bg-card border-border">
                 <CardHeader className="pb-3">
