@@ -97,6 +97,7 @@ services:
     volumes:
       - ./frontend-next/src:/app/src
       - ./frontend-next/public:/app/public
+      - ./frontend-next/postcss.config.mjs:/app/postcss.config.mjs
     command: npm run dev
     depends_on:
       api:
