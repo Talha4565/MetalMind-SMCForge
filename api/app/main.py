@@ -48,11 +48,10 @@ def _validate_secrets():
         if val in bad_values:
             errors.append(f"  {key} is set to a placeholder — generate a real value")
     if errors:
-        logger.critical("SECRET VALIDATION FAILED — refusing to start:\n" + "\n".join(errors))
+        logging.basicConfig(level=logging.CRITICAL)
+        logging.critical("SECRET VALIDATION FAILED — refusing to start:\n" + "\n".join(errors))
         sys.exit(1)
 
-
-_validate_secrets()
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -72,6 +71,8 @@ from api.app.pipeline_routes import pipeline_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_validate_secrets()
 
 app = Flask(__name__)
 
@@ -172,7 +173,7 @@ def set_security_headers(response):
     
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://s.tradingview.com https://unpkg.com; "
+        "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://s.tradingview.com https://unpkg.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https:; "

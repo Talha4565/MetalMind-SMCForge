@@ -84,11 +84,11 @@ export default function PipelineSummary() {
     );
   }
 
-  const isActive   = status.status === 'active';
-  const goldFresh  = status.data_freshness.gold.is_fresh;
-  const silverFresh = status.data_freshness.silver.is_fresh;
-  const goldModel  = status.models.gold;
-  const silverModel = status.models.silver;
+  const isActive    = status.status === 'active';
+  const goldFresh   = status.data_freshness?.gold?.is_fresh ?? false;
+  const silverFresh = status.data_freshness?.silver?.is_fresh ?? false;
+  const goldModel   = status.models?.gold ?? { exists: false, version: '', features: 89 };
+  const silverModel = status.models?.silver ?? { exists: false, version: '', features: 89 };
 
   return (
     <div className="flex flex-wrap items-center gap-4 px-4 py-1.5 border-b border-terminal-rule bg-terminal-panel overflow-x-auto">
@@ -102,12 +102,12 @@ export default function PipelineSummary() {
       {/* Data freshness */}
       <StatusPill
         label="XAU DATA"
-        value={goldFresh ? `FRESH · ${status.data_freshness.gold.rows.toLocaleString()} rows` : `STALE · ${status.data_freshness.gold.age_hours.toFixed(1)}h`}
+        value={goldFresh ? `FRESH · ${(status.data_freshness?.gold?.rows ?? 0).toLocaleString()} rows` : `STALE · ${(status.data_freshness?.gold?.age_hours ?? 0).toFixed(1)}h`}
         ok={goldFresh}
       />
       <StatusPill
         label="XAG DATA"
-        value={silverFresh ? `FRESH · ${status.data_freshness.silver.rows.toLocaleString()} rows` : `STALE · ${status.data_freshness.silver.age_hours.toFixed(1)}h`}
+        value={silverFresh ? `FRESH · ${(status.data_freshness?.silver?.rows ?? 0).toLocaleString()} rows` : `STALE · ${(status.data_freshness?.silver?.age_hours ?? 0).toFixed(1)}h`}
         ok={silverFresh}
       />
 
@@ -126,7 +126,7 @@ export default function PipelineSummary() {
       {/* Features */}
       <StatusPill
         label="FEATURES"
-        value={`${goldModel.features || 89}`}
+        value={`${goldModel.features ?? 89}`}
         neutral
       />
 
@@ -134,7 +134,7 @@ export default function PipelineSummary() {
       <div className="ml-auto flex items-center gap-1.5">
         <span className="text-[8px] font-mono text-terminal-label tracking-widest">REFRESHED</span>
         <span className="text-[8px] font-mono text-terminal-value">
-          {new Date(status.last_update).toLocaleTimeString('en-US', { hour12: false })}
+          {status.last_update ? new Date(status.last_update).toLocaleTimeString('en-US', { hour12: false }) : '--:--'}
         </span>
       </div>
     </div>
