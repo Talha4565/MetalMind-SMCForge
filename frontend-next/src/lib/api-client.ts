@@ -150,8 +150,11 @@ class ApiClient {
   }
 
   async getBacktestResults(): Promise<BacktestResponse[]> {
-    const response = await this.client.get<BacktestResponse[]>('/api/backtest/results');
-    return response.data;
+    const response = await this.client.get('/api/backtest/results');
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && data.trades) return [data];
+    return [];
   }
 
   // Pipeline

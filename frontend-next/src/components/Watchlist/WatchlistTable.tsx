@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
@@ -36,8 +36,8 @@ export default function WatchlistTable() {
   const fetchSymbols = useCallback(async () => {
     try {
       const data = await apiClient.getWatchlistSymbols();
-      setSymbols(data.symbols);
-      if (!selectedSymbol && data.symbols.length) {
+      setSymbols(data?.symbols ?? []);
+      if (!selectedSymbol && data?.symbols?.length) {
         setSelectedSymbol(data.symbols[0].symbol);
       }
     } catch (err: unknown) {
@@ -51,7 +51,7 @@ export default function WatchlistTable() {
     setError(null);
     try {
       const data = await apiClient.getWatchlist();
-      setWatchlist(data.watchlist);
+      setWatchlist(data?.watchlist ?? []);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unable to load watchlist.';
       setError(message);
