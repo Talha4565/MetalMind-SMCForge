@@ -10,8 +10,8 @@ function SessionSync() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (status === 'authenticated' && (session as any)?.user?.accessToken) {
-      apiClient.setAccessToken((session as any).user.accessToken as string);
+    if (status === 'authenticated' && session?.user?.accessToken) {
+      apiClient.setAccessToken(session.user.accessToken);
       return;
     }
 

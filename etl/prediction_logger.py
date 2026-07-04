@@ -27,7 +27,9 @@ class PredictionLogger:
         confidence: float,
         price: float,
         shap_values: list = None,
-        model_version: str = None
+        model_version: str = None,
+        tp_price: float = None,
+        sl_price: float = None,
     ) -> dict:
         """
         Log a single prediction.
@@ -43,7 +45,9 @@ class PredictionLogger:
             'signal_text': signal_text,
             'confidence': round(confidence, 4),
             'price': round(price, 2),
-            'shap_values': shap_values[:5] if shap_values else [],
+            'tp_price': tp_price,
+            'sl_price': sl_price,
+            'shap_values': shap_values[:5] if isinstance(shap_values, list) else [],
             'model_version': model_version or 'latest',
             'actual_outcome': None,  # Filled later when price moves
             'actual_pnl': None,
@@ -133,7 +137,7 @@ class PredictionLogger:
             logger.info(f"Updated {updated} prediction outcomes")
     
     def get_summary(self, days: int = 7) -> Dict[str, Any]:
-        """Get summary of recent predictions."""
+        """Get summary of recent predictions (BUY/SELL only, excluding HOLD)."""
         from datetime import timedelta
         
         summary = {
@@ -159,16 +163,17 @@ class PredictionLogger:
             with open(log_file, 'r') as f:
                 for line in f:
                     record = json.loads(line.strip())
-                    summary['total_predictions'] += 1
                     
                     if record['signal'] == 1:
                         summary['buy_signals'] += 1
+                        summary['total_predictions'] += 1
+                        total_confidence += record['confidence']
                     elif record['signal'] == -1:
                         summary['sell_signals'] += 1
+                        summary['total_predictions'] += 1
+                        total_confidence += record['confidence']
                     else:
                         summary['hold_signals'] += 1
-                    
-                    total_confidence += record['confidence']
                     
                     if record['actual_outcome']:
                         summary['evaluated'] += 1
@@ -181,3 +186,26 @@ class PredictionLogger:
             summary['avg_confidence'] = round(total_confidence / summary['total_predictions'], 4)
         
         return summary
+
+    def get_history(self, days: int = 7, asset: str = None, limit: int = 200) -> List[Dict[str, Any]]:
+        """Get prediction log entries for the trade log page."""
+        from datetime import timedelta
+
+        records = []
+        for i in range(days):
+            date = (datetime.now() - timedelta(days=i)).strftime('%Y%m%d')
+            log_file = self.log_dir / f"predictions_{date}.jsonl"
+
+            if not log_file.exists():
+                continue
+
+            with open(log_file, 'r') as f:
+                for line in f:
+                    record = json.loads(line.strip())
+                    if asset and record.get('asset', '').lower() != asset.lower():
+                        continue
+                    records.append(record)
+
+        # Sort newest first, apply limit
+        records.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+        return records[:limit]

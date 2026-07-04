@@ -15,6 +15,8 @@ services:
       - PYTHONPATH=/app
       - FLASK_ENV=development
       - FLASK_APP=api/app/main.py
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     volumes:
       - ./api:/app/api
       - ./config:/app/config
@@ -138,16 +140,27 @@ services:
       - /app/__pycache__
     entrypoint: []
     command: >
-      sh -c "
-        cd /app && \
-        python run_pipeline.py --mode schedule
-      "
+      sh -c "cd /app && python scripts/etl_monitor.py"
     working_dir: /app
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
 
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: metalmind-chromadb
+    ports:
+      - "8100:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+
 volumes:
   instance_data:
   db_data:
+  chroma_data:

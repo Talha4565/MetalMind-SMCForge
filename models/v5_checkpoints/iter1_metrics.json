@@ -1,0 +1,16 @@
+{
+  "iteration": 1,
+  "test_accuracy": 0.7867674858223063,
+  "val_accuracy": 0.8150529500756429,
+  "win_rate": 0.5789473684210527,
+  "profit_factor": 1.9302765674434514,
+  "total_trades": 76,
+  "best_params": {
+    "max_depth": 6,
+    "lr": 0.02054996089817555,
+    "sub": 0.7297166462647497,
+    "col": 0.707977567686538,
+    "gamma": 1.9701930099582492,
+    "min_child_weight": 9
+  }
+}

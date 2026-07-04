@@ -12,8 +12,8 @@ export function useAuthSync() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (status === 'authenticated' && (session as any)?.user?.accessToken) {
-      apiClient.setAccessToken((session as any).user.accessToken);
+    if (status === 'authenticated' && session?.user?.accessToken) {
+      apiClient.setAccessToken(session.user.accessToken);
     } else if (status === 'unauthenticated') {
       apiClient.clearAuth();
     }

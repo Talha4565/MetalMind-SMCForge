@@ -42,9 +42,12 @@ def _validate_secrets():
         'JWT_SECRET_KEY': {'replace-with-a-strong-random-jwt-key', ''},
         'REFRESH_SECRET_KEY': {'replace-with-a-strong-random-refresh-key', ''},
     }
+    # FLASK_SECRET_KEY is an accepted alias for SECRET_KEY (used by security_service)
+    aliases = {'SECRET_KEY': 'FLASK_SECRET_KEY'}
     errors = []
     for key, bad_values in placeholders.items():
-        val = os.environ.get(key, '')
+        alias = aliases.get(key)
+        val = os.environ.get(key, '') or (os.environ.get(alias, '') if alias else '')
         if val in bad_values:
             errors.append(f"  {key} is set to a placeholder — generate a real value")
     if errors:
@@ -68,6 +71,7 @@ from api.app.profile import profile_bp
 from api.app.middleware.error_handler import register_error_handlers
 from api.app.etl_routes import etl_bp
 from api.app.pipeline_routes import pipeline_bp
+from api.app.memory_routes import memory_bp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -128,7 +132,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 # Initialize SocketIO for real-time features
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
+    cors_allowed_origins=ALLOWED_ORIGINS,
     async_mode='threading',
     logger=False,
     engineio_logger=False,
@@ -169,7 +173,7 @@ def set_security_headers(response):
     if env == 'development':
         connect_src = "connect-src 'self' http://localhost:* ws://localhost:*; "
     else:
-        connect_src = "connect-src 'self' https://yourdomain.com wss://yourdomain.com; "
+        connect_src = "connect-src 'self' *; "
     
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
@@ -220,6 +224,7 @@ app.register_blueprint(watchlist_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(etl_bp)
 app.register_blueprint(pipeline_bp)
+app.register_blueprint(memory_bp)
 
 
 # FIXED: Encapsulate all global state in proper classes for thread safety and testability
@@ -235,11 +240,11 @@ class ModelManager:
         self.models_dir = MODELS_DIR
     
     def load_model(self, asset: str) -> tuple:
-        """Load model for specific asset."""
+        """Load model for specific asset. V4 for gold, enhanced for silver."""
         if asset == "gold":
-            model_path = self.models_dir / 'enhanced_15m.pkl'
+            model_path = self.models_dir / 'gold_regression_system.pkl'
         elif asset == "silver":
-            model_path = self.models_dir / 'processed' / 'silver_model_enhanced.pkl'
+            model_path = self.models_dir / 'silver_enhanced_15m.pkl'
         else:
             return None, None
         
@@ -250,13 +255,17 @@ class ModelManager:
         try:
             with open(model_path, 'rb') as f:
                 model_data = pickle.load(f)
-                
+
                 # Handle different pickle formats
                 if isinstance(model_data, dict):
-                    model = model_data['model']
-                    feature_names = model_data.get('features', None)
+                    # V4 format: {direction_model, tp_model, sl_model, features}
+                    if 'direction_model' in model_data:
+                        model = model_data['direction_model']
+                        feature_names = model_data.get('features', None)
+                    else:
+                        model = model_data['model']
+                        feature_names = model_data.get('features', None)
                 else:
-                    # If it's just the model object
                     model = model_data
                     try:
                         feature_names = list(model.feature_names_in_) if hasattr(model, 'feature_names_in_') else None
@@ -392,43 +401,152 @@ class BacktestManager:
 
         def _run_backtest():
             try:
-                import subprocess, sys
-                project_root = Path(__file__).parent.parent.parent
+                import pandas as pd
+                import numpy as np
+                from config.settings import REPORTS_DIR
+                from data.loaders import load_asset_data
+                from features.pipeline import engineer_all_features
 
                 with self._lock:
                     self._status['progress'] = 10
 
-                result = subprocess.run(
-                    [sys.executable, 'run.py', '--mode', 'backtest', '--asset', asset],
-                    capture_output=True, text=True, cwd=str(project_root), timeout=300
-                )
+                # Load data using the same loader as predictions
+                df = load_asset_data(asset=asset, primary_tf='15m', session_filter=False)
+                if df is None or len(df) < 50:
+                    with self._lock:
+                        self._status = {'running': False, 'progress': 0, 'error': 'Insufficient data loaded', 'result': None}
+                    return
+
+                # Filter by date range
+                df = df[start_date:end_date]
+                if len(df) < 50:
+                    with self._lock:
+                        self._status = {'running': False, 'progress': 0, 'error': f'Insufficient data for date range: {len(df)} bars', 'result': None}
+                    return
 
                 with self._lock:
-                    self._status['progress'] = 80
+                    self._status['progress'] = 30
 
-                if result.returncode == 0:
-                    results_dir = project_root / 'reports' / 'backtest_results'
-                    latest_file = results_dir / 'latest.json'
-                    backtest_result = None
-                    if latest_file.exists():
-                        with open(latest_file) as f:
-                            backtest_result = json.load(f)
+                # Engineer features
+                featured_df = engineer_all_features(df, add_labels=False)
 
+                # Apply V4-specific features
+                from features.v4_features import compute_v4_features
+                featured_df = compute_v4_features(featured_df)
+
+                with self._lock:
+                    self._status['progress'] = 40
+
+                # Load model with feature names
+                model, feature_names = model_manager.get_or_load_model(asset)
+                if model is None:
                     with self._lock:
-                        self._status = {
-                            'running': False, 'progress': 100, 'error': None,
-                            'result': backtest_result
-                        }
+                        self._status = {'running': False, 'progress': 0, 'error': f'Model not found for {asset}', 'result': None}
+                    return
+
+                # Align features with model expectations (same logic as predictions)
+                X_input = featured_df.copy()
+                if feature_names is not None:
+                    current_cols = X_input.columns
+                    col_lookup = {}
+                    for col in current_cols:
+                        norm = col.lower().replace('_', '')
+                        col_lookup[norm] = col
+                        if norm == 'sessionasia': col_lookup['asia'] = col
+                        if norm == 'sessionlondon' or norm == 'sessionldn': col_lookup['ldn'] = col
+                        if norm == 'sessionny': col_lookup['ny'] = col
+
+                    rename_map = {}
+                    for feat in feature_names:
+                        if feat in current_cols: continue
+                        feat_norm = feat.lower().replace('_', '')
+                        if feat_norm in col_lookup:
+                            rename_map[col_lookup[feat_norm]] = feat
+
+                    if rename_map:
+                        X_input.rename(columns=rename_map, inplace=True)
+
+                    try:
+                        X = X_input[feature_names]
+                    except KeyError:
+                        available = [f for f in feature_names if f in X_input.columns]
+                        X = X_input[available]
                 else:
-                    with self._lock:
-                        self._status = {
-                            'running': False, 'progress': 0,
-                            'error': result.stderr or 'Unknown error', 'result': None
-                        }
-            except subprocess.TimeoutExpired:
+                    X = X_input.select_dtypes(include=['float64', 'int64']).fillna(0)
+
                 with self._lock:
-                    self._status = {'running': False, 'progress': 0, 'error': 'Timeout', 'result': None}
+                    self._status['progress'] = 60
+
+                # Predict signals with V4 trend filter
+                raw_predictions = model.predict(X)
+                try:
+                    raw_probas = model.predict_proba(X)[:, 1]
+                except (AttributeError, IndexError):
+                    raw_probas = np.full(len(raw_predictions), 0.5)
+
+                signals = np.zeros(len(raw_predictions), dtype=int)
+                if 'trend_ema_cross' in X.columns:
+                    for i in range(len(raw_predictions)):
+                        proba = raw_probas[i]
+                        trend = X.iloc[i].get('trend_ema_cross', 0)
+                        confidence = max(proba, 1 - proba)
+                        if trend == 1 and proba >= 0.5 and confidence >= 0.65:
+                            signals[i] = 1   # BUY
+                        elif trend == 0 and proba < 0.5 and confidence >= 0.65:
+                            signals[i] = -1  # SELL
+                else:
+                    signals = (np.array(raw_predictions) > 0).astype(int)
+
+                with self._lock:
+                    self._status['progress'] = 75
+
+                # Run backtest engine
+                from backtesting.engine import BacktestEngine
+                engine = BacktestEngine(asset=asset)
+                results = engine.run_backtest(featured_df, signals)
+
+                with self._lock:
+                    self._status['progress'] = 90
+
+                # Build response
+                metrics = results.get('metrics', {})
+                trades_list = []
+                for t in results.get('trades', []):
+                    trades_list.append({
+                        'entry_time': t.entry_time.isoformat() if hasattr(t, 'entry_time') else str(t.get('entry_time', '')),
+                        'exit_time': t.exit_time.isoformat() if hasattr(t, 'exit_time') else str(t.get('exit_time', '')),
+                        'entry_price': t.entry_price if hasattr(t, 'entry_price') else t.get('entry_price', 0),
+                        'exit_price': t.exit_price if hasattr(t, 'exit_price') else t.get('exit_price', 0),
+                        'pnl_pct': t.pnl_pct if hasattr(t, 'pnl_pct') else t.get('pnl_pct', 0),
+                        'pnl_usd': t.pnl_usd if hasattr(t, 'pnl_usd') else t.get('pnl_usd', 0),
+                        'hit_tp': t.hit_tp if hasattr(t, 'hit_tp') else t.get('hit_tp', False),
+                        'hit_sl': t.hit_sl if hasattr(t, 'hit_sl') else t.get('hit_sl', False),
+                    })
+
+                pf = metrics.get('profit_factor', 0)
+                if not np.isfinite(pf):
+                    pf = 0
+
+                response = {
+                    'win_rate': metrics.get('win_rate', 0),
+                    'profit_factor': pf,
+                    'max_drawdown': metrics.get('max_drawdown_pct', 0),
+                    'total_trades': metrics.get('n_trades', 0),
+                    'net_profit': metrics.get('total_return_usd', 0),
+                    'trades': trades_list,
+                    'asset': asset,
+                }
+
+                with self._lock:
+                    self._status = {
+                        'running': False, 'progress': 100, 'error': None,
+                        'result': response
+                    }
+
             except Exception as e:
+                logger.error(f"Backtest failed: {e}")
+                import traceback
+                traceback.print_exc()
                 with self._lock:
                     self._status = {'running': False, 'progress': 0, 'error': str(e), 'result': None}
 
@@ -455,6 +573,17 @@ prediction_logger = PredictionLogger()
 email_alerts = EmailAlertService(confidence_threshold=0.70)
 # Deterministic gate — runs unconditionally on every candidate alert.
 alert_risk_gate = AlertRiskGate()
+
+# Initialize signal memory pipeline (ChromaDB + confidence adjustment)
+from signal_memory.client import SignalMemoryClient
+from signal_memory.retriever import SignalRetriever
+from signal_memory.updater import SignalUpdater
+from self_learning.tracker import OutcomeTracker
+
+signal_client = SignalMemoryClient()
+signal_retriever = SignalRetriever(client=signal_client)
+signal_updater = SignalUpdater(client=signal_client)
+outcome_tracker = OutcomeTracker()
 # LLM agent — off by default (ML_AGENT_ENABLED). Fail-open. Backtest path never imports this.
 signal_reasoner = SignalReasoner(client=NemotronClient(), pred_logger=prediction_logger)
 
@@ -507,7 +636,8 @@ def health_check():
 @app.route('/api/market/price', methods=['GET'])
 @limiter.limit("30 per minute")
 def get_live_price():
-    """Fetch real-time price from Yahoo Finance.
+    """Fetch real-time price from MT5 cache (written by mt5_price_cache.py on host).
+    Returns 503 if cache is missing or stale (>60s old).
     
     Query params:
         asset: gold or silver (default: gold)
@@ -515,32 +645,39 @@ def get_live_price():
     try:
         asset = request.args.get('asset', 'gold').lower()
         
-        ticker_map = {
-            'gold': 'GC=F',
-            'silver': 'SI=F',
-        }
-        
-        if asset not in ticker_map:
+        if asset not in ['gold', 'silver']:
             return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
         
-        import requests as req
-        ticker = ticker_map[asset]
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = req.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        chart = resp.json()["chart"]["result"][0]
-        meta = chart["meta"]
+        # Read MT5 cache
+        cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
+        if not cache_path.exists():
+            return jsonify({'error': 'MT5 price cache not found. Run mt5_price_cache.py on host.', 'source': 'none'}), 503
         
-        return jsonify({
-            'asset': asset,
-            'price': float(meta["regularMarketPrice"]),
-            'open': float(meta.get("chartPreviousClose", meta["regularMarketPrice"])),
-            'high': float(meta.get("regularMarketPrice", 0)),
-            'low': float(meta.get("regularMarketPrice", 0)),
-            'volume': int(meta.get("regularMarketVolume", 0)),
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-        })
+        try:
+            with open(cache_path, encoding='utf-8-sig') as f:
+                cache = json.load(f)
+            
+            updated_at = datetime.fromisoformat(cache['updated_at'])
+            age_seconds = (datetime.now() - updated_at).total_seconds()
+            
+            if age_seconds > 60:
+                return jsonify({'error': f'MT5 cache stale ({int(age_seconds)}s old). Check mt5_price_cache.py.', 'source': 'stale'}), 503
+            
+            if asset not in cache.get('prices', {}):
+                return jsonify({'error': f'No MT5 price data for {asset}'}), 404
+            
+            price_data = cache['prices'][asset]
+            return jsonify({
+                'asset': asset,
+                'price': price_data['price'],
+                'bid': price_data.get('bid'),
+                'ask': price_data.get('ask'),
+                'spread': price_data.get('spread'),
+                'source': 'mt5',
+                'timestamp': price_data['timestamp'],
+            })
+        except (json.JSONDecodeError, KeyError, ValueError):
+            return jsonify({'error': 'MT5 cache file corrupted'}), 500
     
     except Exception as e:
         logger.error(f"Error fetching live price: {e}")
@@ -583,12 +720,13 @@ def get_latest_predictions():
         
         if df is None:
             logger.info(f"Loading {asset} data for predictions...")
-            df = load_asset_data(asset=asset, primary_tf='15m', session_filter=True)
-            
-            # Apply feature engineering
+            # load_asset_data returns multi-TF aligned data (15m + 30m + 1h columns)
+            df = load_asset_data(asset=asset, primary_tf='15m', session_filter=False)
+
+            # Apply standard feature engineering
             df = engineer_all_features(df, add_labels=False)
-            
-            # Cache the engineered data
+
+            # Cache the engineered data (without V4 features)
             prediction_cache.set(cache_key, df)
         else:
             logger.info(f"Using cached data for {asset}")
@@ -596,26 +734,27 @@ def get_latest_predictions():
         # Work on a COPY to avoid corrupting the cached dataframe
         df = df.copy()
         
-        # Inject current live price into the latest bar
+        # Always compute V4 features (they depend on live data)
+        from features.v4_features import compute_v4_features
+        df = compute_v4_features(df)
+        
+        # Inject current live price from MT5 cache into the latest bar
         try:
-            import requests as req
-            ticker_map = {'gold': 'XAUUSD=X', 'silver': 'XAGUSD=X'}
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_map[asset]}?interval=1m&range=1d"
-            resp = req.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            resp.raise_for_status()
-            meta = resp.json()["chart"]["result"][0]["meta"]
-            live_price = float(meta["regularMarketPrice"])
-            
-            # Update the latest bar with current price
-            latest_idx = df.index[-1]
-            df.loc[latest_idx, 'close'] = live_price
-            df.loc[latest_idx, 'open'] = live_price
-            df.loc[latest_idx, 'high'] = live_price
-            df.loc[latest_idx, 'low'] = live_price
-            df.loc[latest_idx, 'price'] = live_price
-            logger.info(f"Injected live price ${live_price:.2f} into latest {asset} bar")
+            cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
+            if cache_path.exists():
+                with open(cache_path, encoding='utf-8-sig') as f:
+                    cache = json.load(f)
+                if asset in cache.get('prices', {}):
+                    live_price = cache['prices'][asset]['price']
+                    latest_idx = df.index[-1]
+                    df.loc[latest_idx, 'close'] = live_price
+                    df.loc[latest_idx, 'open'] = live_price
+                    df.loc[latest_idx, 'high'] = live_price
+                    df.loc[latest_idx, 'low'] = live_price
+                    df.loc[latest_idx, 'price'] = live_price
+                    logger.info(f"Injected MT5 live price ${live_price:.2f} into latest {asset} bar")
         except Exception as e:
-            logger.warning(f"Could not fetch live price for prediction: {e}")
+            logger.warning(f"Could not load MT5 live price: {e}")
         
         # Get most recent N bars
         recent_data = df.iloc[-limit:].copy()
@@ -659,12 +798,25 @@ def get_latest_predictions():
         # Get predictions and probabilities
         predictions = model.predict(X)
 
-        
         try:
-            probabilities = model.predict_proba(X)[:, 1]  # Probability of signal
+            probabilities = model.predict_proba(X)[:, 1]
         except (AttributeError, IndexError):
-            # Fallback for models without predict_proba
             probabilities = [0.5] * len(predictions)
+
+        # V4 trend filter: BUY when trend_ema_cross==1 AND proba>=0.5 AND confidence>=0.65
+        # SELL when trend_ema_cross==0 AND proba<0.5 AND confidence>=0.65
+        # HOLD otherwise
+        if 'trend_ema_cross' in X.columns:
+            for i in range(len(predictions)):
+                proba = probabilities[i]
+                trend = X.iloc[i].get('trend_ema_cross', 0)
+                confidence = max(proba, 1 - proba)
+                if trend == 1 and proba >= 0.5 and confidence >= 0.65:
+                    predictions[i] = 1   # BUY
+                elif trend == 0 and proba < 0.5 and confidence >= 0.65:
+                    predictions[i] = -1  # SELL
+                else:
+                    predictions[i] = 0   # HOLD
         
         # Compute real SHAP values for the latest bar
         shap_values_for_response = [{'feature': 'N/A', 'contribution': 0.0}] * len(predictions)
@@ -708,13 +860,53 @@ def get_latest_predictions():
         # Log the latest prediction and check for alerts
         if results:
             latest = results[-1]
+            # Compute TP/SL levels from config
+            tp_pct = 0.0045 if asset == 'gold' else 0.003
+            sl_pct = 0.0015 if asset == 'gold' else 0.001
+            entry_price = latest['price']
+            tp_price = round(entry_price * (1 + tp_pct), 2)
+            sl_price = round(entry_price * (1 - sl_pct), 2)
+
             prediction_logger.log_prediction(
                 asset=asset,
                 signal=latest['signal'],
                 confidence=latest['confidence'],
                 price=latest['price'],
-                shap_values=latest.get('shap_values', [])
+                shap_values=latest.get('shap_values', []),
+                tp_price=tp_price,
+                sl_price=sl_price,
             )
+            
+            # Store signal in ChromaDB for similarity search
+            try:
+                signal_features = {
+                    'asset': asset,
+                    'signal': int(latest['signal']),
+                    'confidence': float(latest['confidence']),
+                    'price': float(latest['price']),
+                }
+                # Add key SHAP features for embedding (ensure list type)
+                shap_raw = latest.get('shap_values', [])
+                if isinstance(shap_raw, list):
+                    for shap in shap_raw[:5]:
+                        if isinstance(shap, dict):
+                            signal_features[str(shap.get('feature', 'unknown'))] = float(shap.get('contribution', 0))
+                
+                signal_updater.store_signal(signal_features)
+            except Exception as e:
+                logger.warning(f"Could not store signal in ChromaDB: {e}")
+            
+            # Adjust confidence based on similar past signals
+            try:
+                base_confidence = latest['confidence']
+                adjusted_confidence = signal_retriever.adjust_confidence(
+                    signal_features, base_confidence
+                )
+                if adjusted_confidence != base_confidence:
+                    logger.info(f"Confidence adjusted: {base_confidence:.3f} → {adjusted_confidence:.3f}")
+                    latest['confidence'] = adjusted_confidence
+            except Exception as e:
+                logger.warning(f"Could not adjust confidence: {e}")
             
             # Send email alert if confidence > 70% and signal is BUY/SELL
             if email_alerts.should_alert(latest['signal'], latest['confidence']):
@@ -762,6 +954,55 @@ def get_latest_predictions():
                     else:
                         logger.info(f"Alert suppressed by agent: {agent.reason}")
         
+        # Check outcomes for all assets using current prices
+        try:
+            live_prices = {}
+            for a in ['gold', 'silver']:
+                cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
+                if cache_path.exists():
+                    with open(cache_path, encoding='utf-8-sig') as f:
+                        cache = json.load(f)
+                    if a in cache.get('prices', {}):
+                        live_prices[a] = cache['prices'][a]['price']
+            if live_prices:
+                prediction_logger.check_outcomes(live_prices)
+                
+                # Update outcome tracker for self-learning
+                try:
+                    for log_file in sorted(Path('/app/reports/predictions').glob('predictions_*.jsonl'))[-3:]:
+                        for line in log_file.read_text().splitlines():
+                            record = json.loads(line)
+                            if record.get('actual_outcome') and record.get('signal') != 0:
+                                outcome_tracker.log_outcome(
+                                    signal_id=f"{record['timestamp']}_{record['asset']}",
+                                    asset=record['asset'],
+                                    signal=record['signal'],
+                                    confidence=record['confidence'],
+                                    price=record.get('price', 0),
+                                    entry_price=record.get('price', 0),
+                                    outcome=record['actual_outcome'],
+                                    pnl=record.get('actual_pnl', 0),
+                                )
+                except Exception as e:
+                    logger.warning(f"Could not update outcome tracker: {e}")
+            
+            # Check if retraining is needed (daily, not on every request)
+            try:
+                from self_learning.retrainer import ModelRetrainer
+                retrainer = ModelRetrainer()
+                if retrainer.should_retrain(min_outcomes=10, accuracy_threshold=0.55):
+                    logger.info("Retrain triggered — running in background")
+                    import threading
+                    threading.Thread(
+                        target=retrainer.retrain_model,
+                        args=(asset,),
+                        daemon=True
+                    ).start()
+            except Exception as e:
+                logger.warning(f"Retrain check failed: {e}")
+        except Exception as e:
+            logger.warning(f"Could not check outcomes: {e}")
+
         return jsonify({
             'asset': asset,
             'predictions': results,
@@ -779,10 +1020,110 @@ def get_latest_predictions():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/predictions/history', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_prediction_history():
+    """Get prediction log history for the trade log page.
+
+    Query params:
+        days: Number of days to look back (default 7)
+        asset: Filter by asset (gold/silver, optional)
+        limit: Max records to return (default 200)
+    """
+    try:
+        days = int(request.args.get('days', 7))
+        asset = request.args.get('asset', '').strip() or None
+        limit = int(request.args.get('limit', 200))
+
+        days = max(1, min(days, 90))
+        limit = max(1, min(limit, 1000))
+
+        history = prediction_logger.get_history(days=days, asset=asset, limit=limit)
+        # Filter out HOLD signals — only show actionable trades (BUY/SELL)
+        history = [r for r in history if r.get('signal') != 0]
+        
+        # Sort by timestamp descending (newest first)
+        history.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+        
+        summary = prediction_logger.get_summary(days=days)
+
+        return jsonify({
+            'predictions': history,
+            'summary': summary,
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error getting prediction history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/orchestrator/status', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_orchestrator_status():
+    """Get full orchestrator status for the dashboard."""
+    try:
+        from etl.orchestrator import PipelineOrchestrator
+        orch = PipelineOrchestrator()
+        
+        # MT5 cache status
+        cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
+        mt5_status = {'exists': False, 'fresh': False, 'age_seconds': None}
+        if cache_path.exists():
+            try:
+                with open(cache_path, encoding='utf-8-sig') as f:
+                    cache = json.load(f)
+                updated_at = datetime.fromisoformat(cache['updated_at'])
+                age = (datetime.now() - updated_at).total_seconds()
+                mt5_status = {
+                    'exists': True,
+                    'fresh': age < 60,
+                    'age_seconds': round(age),
+                    'updated_at': cache['updated_at'],
+                }
+            except Exception:
+                mt5_status = {'exists': True, 'fresh': False, 'age_seconds': None, 'error': 'parse failed'}
+        
+        # ChromaDB status
+        chroma_status = {'connected': False, 'signal_count': 0}
+        try:
+            from signal_memory.client import SignalMemoryClient
+            client = SignalMemoryClient()
+            collection = client.get_collection('signal_patterns')
+            chroma_status = {'connected': True, 'signal_count': collection.count()}
+        except Exception as e:
+            chroma_status = {'connected': False, 'error': str(e)}
+        
+        # Retrain status
+        retrain_status = {'last_run': None, 'outcomes_available': 0, 'should_retrain': False}
+        try:
+            from self_learning.tracker import OutcomeTracker
+            tracker = OutcomeTracker()
+            summary = tracker.get_summary(days=30)
+            retrain_status['outcomes_available'] = summary.get('total', 0)
+            retrain_status['win_rate'] = summary.get('win_rate', 0)
+            
+            from self_learning.retrainer import ModelRetrainer
+            retrainer = ModelRetrainer()
+            retrain_status['should_retrain'] = retrainer.should_retrain(min_outcomes=10, accuracy_threshold=0.55)
+        except Exception as e:
+            retrain_status['error'] = str(e)
+        
+        return jsonify({
+            'pipeline': orch.get_dashboard_data(),
+            'mt5_cache': mt5_status,
+            'chromadb': chroma_status,
+            'retrain': retrain_status,
+            'timestamp': datetime.now().isoformat(),
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error getting orchestrator status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/backtest/results', methods=['GET'])
-@token_required
-@limiter.limit("60 per minute")  # FIXED: Add rate limiting
-def get_backtest_results(current_user_email):
+@limiter.limit("60 per minute")
+def get_backtest_results():
     """Get backtest results.
     
     Query params:
@@ -826,9 +1167,8 @@ def get_backtest_results(current_user_email):
 
 
 @app.route('/api/backtest/run', methods=['POST'])
-@token_required
 @limiter.limit("1 per hour")
-def run_backtest(current_user_email):
+def run_backtest():
     """Run backtest with specified parameters."""
     try:
         params = request.json
@@ -850,8 +1190,7 @@ def run_backtest(current_user_email):
 
 
 @app.route('/api/backtest/status', methods=['GET'])
-@token_required
-def get_backtest_status(current_user_email):
+def get_backtest_status():
     """Get current backtest execution status and progress."""
     status = backtest_manager.get_status()
     return jsonify(status), 200
@@ -1209,18 +1548,6 @@ def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
         return None
 
 
-@app.route('/api/pipeline/status', methods=['GET'])
-@limiter.limit("30 per minute")
-def get_pipeline_status():
-    """Get pipeline health, status, data freshness, and model backups."""
-    try:
-        from etl.orchestrator import PipelineOrchestrator
-        orch = PipelineOrchestrator()
-        return jsonify(orch.get_dashboard_data())
-    except Exception as e:
-        logger.error(f"Error getting pipeline status: {e}")
-        return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/backtest/export', methods=['GET'])
 @limiter.limit("30 per minute")
@@ -1238,7 +1565,7 @@ def export_backtest():
         fmt = request.args.get('format', 'csv').lower()
         export_type = request.args.get('type', 'all').lower()
 
-        results_path = REPORTS_DIR / 'backtest_results' / 'latest.json'
+        results_path = Path(__file__).parent.parent.parent / 'reports' / 'backtest_results' / 'latest.json'
         if not results_path.exists():
             return jsonify({'error': 'No backtest results found. Run a backtest first.'}), 404
 

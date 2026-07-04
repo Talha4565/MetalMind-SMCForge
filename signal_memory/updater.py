@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 from .client import SignalMemoryClient
-from .embedder import SignalEmbedder
+from .embedder import SignalEmbedder, ChromaDBEmbeddingFunction
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +21,7 @@ class SignalUpdater:
     
     def get_collection(self):
         """Get the signal patterns collection."""
-        return self.client.get_collection(
-            self.collection_name,
-            embedding_function=self.embedder.get_model()
-        )
+        return self.client.get_collection(self.collection_name)
     
     def store_signal(self, signal_data: Dict[str, Any], prediction_id: str = None) -> str:
         """
@@ -64,12 +61,23 @@ class SignalUpdater:
             if key in signal_data:
                 metadata[key] = float(signal_data[key])
         
-        # Store in ChromaDB
-        collection.upsert(
-            ids=[prediction_id],
-            documents=[document],
-            metadatas=[metadata]
-        )
+        # Store in ChromaDB with embedding
+        try:
+            embedding = self.embedder.embed_signal(signal_data)
+            collection.upsert(
+                ids=[prediction_id],
+                documents=[document],
+                embeddings=[embedding],
+                metadatas=[metadata]
+            )
+        except Exception as e:
+            # Fallback: store without embedding (won't support similarity search)
+            logger.warning(f"Could not compute embedding, storing without: {e}")
+            collection.upsert(
+                ids=[prediction_id],
+                documents=[document],
+                metadatas=[metadata]
+            )
         
         logger.info(f"Stored signal: {prediction_id} ({metadata['signal']})")
         return prediction_id

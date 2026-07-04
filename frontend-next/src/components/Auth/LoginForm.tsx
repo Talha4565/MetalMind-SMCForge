@@ -118,7 +118,16 @@ export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormPro
                     className="h-11 bg-input/30 border-border text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/20 transition-all"
                   />
                 </FormControl>
+              <div className="flex items-center justify-between mt-1">
                 <FormMessage className="text-xs" />
+                <button
+                  type="button"
+                  className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors ml-auto"
+                  onClick={() => {}}
+                >
+                  Forgot password?
+                </button>
+              </div>
               </FormItem>
             )}
           />

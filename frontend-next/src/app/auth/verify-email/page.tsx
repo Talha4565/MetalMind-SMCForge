@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { VerifyEmailForm } from '@/components/Auth/VerifyEmailForm';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import { ApiError } from '@/lib/api-types';
@@ -12,22 +12,15 @@ type VerifyEmailValues = {
   otp_code: string;
 };
 
-/**
- * Email Verification Page.
- * Handles OTP code entry and email verification.
- */
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState<string>(() => {
-    if (typeof window === 'undefined') return '';
-    const params = new URLSearchParams(window.location.search);
-    return params.get('email') ? decodeURIComponent(params.get('email')!) : '';
-  });
+  const [email, setEmail] = useState<string>(searchParams.get('email') || '');
 
   const handleVerifyEmail = async (values: VerifyEmailValues) => {
     setIsLoading(true);
-    
+
     try {
       const response = await apiClient.verifyEmail({
         email: email || values.email,
@@ -36,8 +29,7 @@ export default function VerifyEmailPage() {
 
       if (response.success) {
         toast.success(response.message || 'Email verified successfully!');
-        
-        // Navigate to the completion page
+
         setTimeout(() => {
           router.push(`/auth/verify-success?email=${encodeURIComponent(email || values.email)}`);
         }, 700);
@@ -60,7 +52,7 @@ export default function VerifyEmailPage() {
     }
 
     setIsLoading(true);
-    
+
     try {
       const response = await apiClient.resendOTP({
         email: resendEmail,
@@ -82,12 +74,11 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      {/* Visual background elements */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-600/10 rounded-full blur-[128px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-teal-600/10 rounded-full blur-[128px] pointer-events-none" />
-      
+
       <div className="relative z-10 w-full max-w-md">
-        <VerifyEmailForm 
+        <VerifyEmailForm
           onSubmit={handleVerifyEmail}
           onResendOTP={handleResendOTP}
           email={email}
@@ -95,5 +86,17 @@ export default function VerifyEmailPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

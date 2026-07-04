@@ -17,18 +17,25 @@ CHROMA_PORT = 8100
 class SignalMemoryClient:
     """ChromaDB client for signal storage."""
     
-    def __init__(self, host: str = None, port: int = None, persistent: bool = True):
+    def __init__(self, host: str = None, port: int = None, persistent: bool = None):
         """
         Initialize ChromaDB client.
         
         Args:
-            host: ChromaDB host (default: localhost)
-            port: ChromaDB port (default: 8100)
-            persistent: If True, use embedded mode with local storage
+            host: ChromaDB host (default: chromadb for Docker, localhost otherwise)
+            port: ChromaDB port (default: 8000 for Docker)
+            persistent: If True, use embedded mode. If None, auto-detect from environment.
         """
-        self.host = host or CHROMA_HOST
-        self.port = port or CHROMA_PORT
-        self.persistent = persistent
+        import os
+        self.host = host or os.environ.get('CHROMA_HOST', 'chromadb')
+        self.port = port or int(os.environ.get('CHROMA_PORT', '8000'))
+        
+        # Auto-detect: use Docker if CHROMA_HOST is set, embedded otherwise
+        if persistent is None:
+            self.persistent = not os.environ.get('CHROMA_HOST')
+        else:
+            self.persistent = persistent
+            
         self._client = None
         self._collections = {}
     

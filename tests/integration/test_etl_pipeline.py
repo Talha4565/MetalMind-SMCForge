@@ -21,6 +21,8 @@ class MockExtractor:
             'close': [1.5, 2.5, 3.5],
             'volume': [100, 200, 300]
         })
+        self.last_run = None
+        self.records_extracted = 0
 
     def extract(self):
         return self._data
@@ -28,17 +30,41 @@ class MockExtractor:
     def validate(self, data):
         return isinstance(data, pd.DataFrame) and len(data) > 0
 
+    def run(self):
+        data = self.extract()
+        if not self.validate(data):
+            raise ValueError("Data validation failed")
+        self.last_run = datetime.now()
+        self.records_extracted = len(data)
+        return data
+
+    def get_metadata(self):
+        return {
+            'extractor': 'MockExtractor',
+            'last_run': self.last_run.isoformat() if self.last_run else None,
+            'records_extracted': self.records_extracted,
+        }
+
 
 class MockTransformer:
     """Mock transformer that adds a column."""
 
     def __init__(self, col_name='transformed'):
         self.col_name = col_name
+        self.last_run = None
 
     def transform(self, data):
         data = data.copy()
         data[self.col_name] = data['close'] * 2
         return data
+
+    def run(self, data):
+        result = self.transform(data)
+        self.last_run = datetime.now()
+        return result
+
+    def get_metadata(self):
+        return {'transformer': 'MockTransformer', 'last_run': self.last_run.isoformat() if self.last_run else None}
 
 
 class MockFailingTransformer:
@@ -53,10 +79,21 @@ class MockLoader:
 
     def __init__(self):
         self.loaded_data = None
+        self.records_loaded = 0
+        self.last_run = None
 
     def load(self, data):
         self.loaded_data = data
+        self.records_loaded = len(data) if hasattr(data, '__len__') else 0
         return True
+
+    def run(self, data):
+        success = self.load(data)
+        self.last_run = datetime.now()
+        return success
+
+    def get_metadata(self):
+        return {'loader': 'MockLoader', 'last_run': self.last_run.isoformat() if self.last_run else None}
 
 
 class MockFailingLoader:

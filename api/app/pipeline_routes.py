@@ -6,6 +6,7 @@ Provides status, details, and control for ETL/Feature/Model pipelines.
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from pathlib import Path
+from api.app.auth import token_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,9 +49,9 @@ def _get_model_info(asset: str) -> dict:
     from config.settings import MODEL_CONFIG
 
     if asset == 'gold':
-        model_path = MODEL_CONFIG.get('enhanced_model_path', Path('models/enhanced_15m.pkl'))
+        model_path = Path('models/gold_regression_system.pkl')
     else:
-        model_path = Path('models/processed/silver_model_enhanced.pkl')
+        model_path = Path('models/silver_enhanced_15m.pkl')
 
     if not model_path.exists():
         return {'exists': False, 'version': None, 'size_mb': 0, 'last_modified': None}
@@ -106,7 +107,7 @@ def get_pipeline_details():
                 'status': 'active',
                 'schedule': 'Every 15 minutes',
                 'last_run': gold_fresh['last_date'],
-                'description': 'Fetches OHLCV data from Yahoo Finance and appends to CSV files'
+                'description': 'Fetches OHLCV data from MT5 and appends to CSV files'
             },
             'features': {
                 'name': 'Feature Engineering',
@@ -141,7 +142,8 @@ def get_pipeline_details():
 
 
 @pipeline_bp.route('/run', methods=['POST'])
-def trigger_pipeline_run():
+@token_required
+def trigger_pipeline_run(_email=None):
     """Trigger manual pipeline run."""
     try:
         data = request.json or {}

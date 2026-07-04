@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 // Live clock
 function TerminalClock() {
@@ -72,18 +73,43 @@ function MarketStatus() {
 }
 
 export default function Header() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const logout = useLogout();
   const router = useRouter();
+  const [profileName, setProfileName] = useState('');
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const fetchName = async () => {
+      try {
+        const data = await apiClient.getProfile();
+        setProfileName(data.profile?.name || '');
+      } catch {
+        // Use email fallback
+      }
+    };
+    fetchName();
+  }, [status]);
 
   const isAuthenticated = !!session?.user?.email;
-  const userHandle = session?.user?.email?.split('@')[0]?.toUpperCase() ?? 'GUEST';
-  const userInitials = userHandle.slice(0, 2);
+  const displayName = profileName || session?.user?.email?.split('@')[0] || 'GUEST';
+  const userInitials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <header className="h-10 border-b border-terminal-rule bg-sidebar flex items-center justify-between px-4 sticky top-0 z-40 shrink-0">
-      {/* Left — breadcrumb + market status */}
+      {/* Left — name + breadcrumb + market status */}
       <div className="flex items-center gap-4">
+        {isAuthenticated && profileName && (
+          <div className="flex items-center gap-2 border-r border-terminal-rule pr-4">
+            <div className="w-5 h-5 bg-terminal-hold flex items-center justify-center">
+              <span className="text-black text-[8px] font-black font-mono">{userInitials}</span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-terminal-value tracking-widest hidden sm:block">
+              {profileName}
+            </span>
+          </div>
+        )}
+
         <MarketStatus />
 
         <div className="hidden md:flex items-center gap-3">
@@ -108,7 +134,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         <TerminalClock />
 
-        <button className="relative p-1 text-terminal-label hover:text-terminal-value transition-colors">
+        <button className="relative p-1 text-terminal-label hover:text-terminal-value transition-colors" aria-label="Notifications">
           <Bell className="w-3.5 h-3.5" />
           <span className="absolute top-0.5 right-0.5 w-1 h-1 bg-terminal-buy rounded-full" />
         </button>
@@ -122,7 +148,7 @@ export default function Header() {
                 <span className="text-black text-[8px] font-black font-mono">{userInitials}</span>
               </div>
               <span className="text-[9px] font-mono font-bold text-terminal-label group-hover:text-terminal-value tracking-widest hidden sm:block">
-                {userHandle.slice(0, 12)}
+                {displayName.slice(0, 12)}
               </span>
               <ChevronDown className="w-3 h-3 text-terminal-label" />
             </DropdownMenuTrigger>

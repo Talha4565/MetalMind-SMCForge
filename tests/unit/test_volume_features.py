@@ -33,12 +33,13 @@ class TestCumulativeVolumeDelta:
 
     def test_cvd_columns_added(self, small_ohlcv_df, volume_features):
         result = volume_features["add_cumulative_volume_delta"](small_ohlcv_df)
-        assert 'cvd' in result.columns
-        assert 'cvd_normalized' in result.columns
+        assert 'CVD_4' in result.columns
+        assert 'CVD_16' in result.columns
+        assert 'CVD_96' in result.columns
 
     def test_cvd_is_numeric(self, small_ohlcv_df, volume_features):
         result = volume_features["add_cumulative_volume_delta"](small_ohlcv_df)
-        assert pd.api.types.is_numeric_dtype(result['cvd'])
+        assert pd.api.types.is_numeric_dtype(result['CVD_4'])
 
 
 class TestVolumeImbalance:
@@ -46,11 +47,13 @@ class TestVolumeImbalance:
 
     def test_imbalance_columns_added(self, small_ohlcv_df, volume_features):
         result = volume_features["add_volume_imbalance"](small_ohlcv_df)
-        assert 'volume_imbalance' in result.columns
+        assert 'Imbal_4' in result.columns
+        assert 'Imbal_16' in result.columns
+        assert 'Imbal_96' in result.columns
 
     def test_imbalance_range(self, small_ohlcv_df, volume_features):
         result = volume_features["add_volume_imbalance"](small_ohlcv_df)
-        valid = result['volume_imbalance'].dropna()
+        valid = result['Imbal_4'].dropna()
         assert (valid >= -1).all() and (valid <= 1).all()
 
 
@@ -59,8 +62,9 @@ class TestWickRatio:
 
     def test_wick_columns_added(self, small_ohlcv_df, volume_features):
         result = volume_features["add_wick_ratio"](small_ohlcv_df)
-        assert 'upper_wick_ratio' in result.columns
-        assert 'lower_wick_ratio' in result.columns
+        assert 'Wick_4' in result.columns
+        assert 'Wick_16' in result.columns
+        assert 'Wick_96' in result.columns
 
 
 class TestReturnsVolatility:
@@ -68,8 +72,10 @@ class TestReturnsVolatility:
 
     def test_returns_columns(self, small_ohlcv_df, volume_features):
         result = volume_features["add_basic_returns_volatility"](small_ohlcv_df)
-        assert 'return_1' in result.columns
-        assert 'volatility_20' in result.columns
+        assert 'Ret_4' in result.columns
+        assert 'Std_4' in result.columns
+        assert 'Ret_16' in result.columns
+        assert 'Std_16' in result.columns
 
 
 class TestSessionFlags:
@@ -77,7 +83,10 @@ class TestSessionFlags:
 
     def test_session_flags_added(self, small_ohlcv_df, volume_features):
         result = volume_features["add_session_flags"](small_ohlcv_df)
-        assert 'is_london' in result.columns or 'session_hour' in result.columns
+        assert 'session_asia' in result.columns
+        assert 'session_london' in result.columns
+        assert 'session_ny' in result.columns
+        assert 'session_overlap' in result.columns
 
 
 class TestAllVolumeFeatures:

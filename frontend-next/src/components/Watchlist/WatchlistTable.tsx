@@ -415,13 +415,22 @@ export default function WatchlistTable() {
                       </span>
                     </div>
                     <div className="flex h-28 items-end gap-1">
-                      {[40, 60, 30, 70, 55, 85, 50].map((height, index) => (
-                        <div
-                          key={index}
-                          style={{ height: `${height / 1.2}%` }}
-                          className="w-full rounded-full bg-gradient-to-t from-blue-500 via-sky-400 to-cyan-300"
-                        />
-                      ))}
+                      {preview ? (
+                        Array.from({ length: 7 }, (_, i) => {
+                          const base = preview.confidence * 100;
+                          const variance = Math.sin(i * 1.3 + base) * 20;
+                          const height = Math.max(20, Math.min(95, base + variance));
+                          return (
+                            <div
+                              key={i}
+                              style={{ height: `${height}%` }}
+                              className="w-full rounded-full bg-gradient-to-t from-blue-500 via-sky-400 to-cyan-300"
+                            />
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-slate-500 w-full text-center py-8">No data available</p>
+                      )}
                     </div>
                   </div>
                 </div>

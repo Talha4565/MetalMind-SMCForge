@@ -1,15 +1,16 @@
 """
-Automated pipeline: Fetch live data + Append to CSVs + Retrain model.
+Automated pipeline: Fetch live data via MT5 + Append to CSVs + Retrain model.
 
 Usage:
-    python run_pipeline.py --mode backfill          # Fill gap from Sept 2024 to today
-    python run_pipeline.py --mode update            # Fetch latest candles only (MT5 or yfinance)
+    python run_pipeline.py --mode update            # Fetch latest candles via MT5
     python run_pipeline.py --mode retrain           # Retrain model on full data
-    python run_pipeline.py --mode full              # Backfill + Retrain
+    python run_pipeline.py --mode full              # Update + Retrain
     python run_pipeline.py --mode schedule          # Run continuously (15min update + 24h retrain)
     python run_pipeline.py --mode status            # Show pipeline status
     python run_pipeline.py --mode freshness         # Check data freshness
     python run_pipeline.py --mode backups           # List model backups
+
+Requires MetaTrader 5 terminal running on the host machine.
 """
 
 import sys
@@ -35,10 +36,9 @@ orchestrator = PipelineOrchestrator()
 
 
 def run_fetch_and_append(asset: str, intervals: list = None):
-    """Fetch live data and append to CSVs.
+    """Fetch live data and append to CSVs using MT5.
     
-    Tries MT5 first (requires MetaTrader 5 terminal running).
-    Falls back to yfinance if MT5 is not available.
+    Requires MetaTrader 5 terminal running on the host.
     """
     if intervals is None:
         intervals = ['5m', '15m', '30m', '1h']
@@ -47,7 +47,6 @@ def run_fetch_and_append(asset: str, intervals: list = None):
     logger.info(f"FETCH & APPEND: {asset.upper()}")
     logger.info("=" * 60)
     
-    # Try MT5 first
     try:
         import MetaTrader5 as mt5
         if mt5.initialize():
@@ -62,42 +61,13 @@ def run_fetch_and_append(asset: str, intervals: list = None):
                 logger.info(f"✓ {asset.upper()} data updated via MT5")
                 return
             else:
-                logger.warning(f"MT5 update failed: {result.stderr}")
+                logger.error(f"MT5 update failed: {result.stderr}")
         else:
-            logger.warning("MT5 not available, falling back to yfinance")
+            logger.error(f"MT5 initialize failed: {mt5.last_error()}")
     except ImportError:
-        logger.warning("MetaTrader5 not installed, falling back to yfinance")
+        logger.error("MetaTrader5 not installed. Run: pip install MetaTrader5")
     except Exception as e:
-        logger.warning(f"MT5 error: {e}, falling back to yfinance")
-    
-    # Fallback to yfinance
-    try:
-        from etl.extractors.yfinance_extractor import YFinanceExtractor
-        from etl.loaders.csv_append_loader import CSVAppendLoader
-        
-        extractor = YFinanceExtractor(asset=asset, intervals=intervals)
-        data = extractor.extract()
-        
-        if not data:
-            logger.error(f"No data fetched for {asset}")
-            return
-        
-        output_dir = GOLD_DATASET_DIR if asset == 'gold' else SILVER_DATASET_DIR
-        loader = CSVAppendLoader(
-            output_dir=str(output_dir),
-            asset=asset
-        )
-        success = loader.run(data)
-        
-        if success:
-            logger.info(f"✓ {asset.upper()} data appended via yfinance")
-        else:
-            logger.error(f"✗ Failed to append {asset.upper()} data")
-    
-    except ImportError:
-        logger.error("Neither MT5 nor yfinance available. Cannot fetch data.")
-    except Exception as e:
-        logger.error(f"Data fetch failed: {e}")
+        logger.error(f"MT5 error: {e}")
 
 
 def run_backfill(asset: str):

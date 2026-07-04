@@ -89,8 +89,8 @@ class ModelVersionManager:
     
     def create_backup(self, asset: str) -> Optional[str]:
         """Create backup of current model before retraining."""
-        model_path = self.models_dir / f'enhanced_15m.pkl' if asset == 'gold' else \
-                     self.models_dir / 'processed' / 'silver_model_enhanced.pkl'
+        model_path = self.models_dir / 'gold_regression_system.pkl' if asset == 'gold' else \
+                     self.models_dir / 'silver_enhanced_15m.pkl'
         
         if not model_path.exists():
             logger.warning(f"No model to backup for {asset}")
@@ -117,8 +117,8 @@ class ModelVersionManager:
             return False
         
         latest_backup = backups[0]
-        model_path = self.models_dir / f'enhanced_15m.pkl' if asset == 'gold' else \
-                     self.models_dir / 'processed' / 'silver_model_enhanced.pkl'
+        model_path = self.models_dir / 'gold_regression_system.pkl' if asset == 'gold' else \
+                     self.models_dir / 'silver_enhanced_15m.pkl'
         
         shutil.copy2(latest_backup, model_path)
         logger.info(f"✓ Rolled back {asset} to {latest_backup.name}")

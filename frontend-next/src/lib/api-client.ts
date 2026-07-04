@@ -4,6 +4,7 @@ import {
   LoginPayload,
   RegisterPayload,
   PredictionResponse,
+  PredictionHistoryResponse,
   AssetType,
   BacktestRequest,
   BacktestResponse,
@@ -105,6 +106,13 @@ class ApiClient {
     return response.data;
   }
 
+  async getPredictionHistory(days = 7, asset?: string): Promise<PredictionHistoryResponse> {
+    const params = new URLSearchParams({ days: String(days) });
+    if (asset) params.set('asset', asset);
+    const response = await this.client.get<PredictionHistoryResponse>(`/api/predictions/history?${params}`);
+    return response.data;
+  }
+
   // Live Price
   async getLivePrice(asset: AssetType): Promise<{ asset: string; price: number; timestamp: string }> {
     const response = await this.client.get<{ asset: string; price: number; timestamp: string }>(`/api/market/price?asset=${asset}`);
@@ -153,7 +161,18 @@ class ApiClient {
     const response = await this.client.get('/api/backtest/results');
     const data = response.data;
     if (Array.isArray(data)) return data;
-    if (data && typeof data === 'object' && data.trades) return [data];
+    if (data && typeof data === 'object') {
+      // Backend may return { summary: {...}, trades: [...] } or flat { win_rate, ... }
+      const s = data.summary || data;
+      return [{
+        win_rate: s.win_rate ?? 0,
+        profit_factor: s.profit_factor ?? 0,
+        max_drawdown: s.max_drawdown ?? s.max_drawdown_pct ?? 0,
+        total_trades: s.total_trades ?? s.n_trades ?? 0,
+        net_profit: s.net_profit ?? s.total_return_usd ?? 0,
+        trades: data.trades || [],
+      }];
+    }
     return [];
   }
 

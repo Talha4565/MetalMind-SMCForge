@@ -40,6 +40,7 @@ export default function BacktestPage() {
   const [asset, setAsset] = useState<AssetType>('gold');
   const [startDate, setStartDate] = useState('2026-01-01');
   const [endDate, setEndDate] = useState('2026-05-01');
+  const [capital, setCapital] = useState(10000);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState('');
   const [backtestError, setBacktestError] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function BacktestPage() {
   }, []);
 
   useEffect(() => {
-    if (!runBacktest.isPending && progress === 0 && !backtestDone && !backtestError) return;
+    if (!runBacktest.isPending) return;
 
     const interval = setInterval(async () => {
       const shouldContinue = await pollStatus();
@@ -81,7 +82,7 @@ export default function BacktestPage() {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, [runBacktest.isPending, progress, backtestDone, backtestError, pollStatus]);
+  }, [runBacktest.isPending, pollStatus]);
 
   const handleRun = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,16 +91,23 @@ export default function BacktestPage() {
     setProgress(0);
     setProgressLabel('Starting...');
 
+    if (startDate >= endDate) {
+      setBacktestError('Start date must be before end date');
+      return;
+    }
+
     try {
       await runBacktest.mutateAsync({
         asset,
         start_date: startDate,
         end_date: endDate,
         strategy: 'SMC_FORGE_V1',
-        initial_capital: 10000,
+        initial_capital: capital,
       });
     } catch (error) {
-      console.error('Backtest failed:', error);
+      const msg = error instanceof Error ? error.message : (error as { error?: string })?.error || 'Backtest failed';
+      setBacktestError(msg);
+      setProgressLabel('Failed');
     }
   };
 
@@ -165,8 +173,11 @@ export default function BacktestPage() {
                   <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capital ($)</Label>
                   <Input
                     type="number"
-                    defaultValue={10000}
+                    value={capital}
+                    onChange={(e) => setCapital(Number(e.target.value) || 0)}
                     className="bg-input/30 border-border"
+                    min={100}
+                    step={100}
                   />
                 </div>
 
@@ -177,7 +188,13 @@ export default function BacktestPage() {
                       <span className="text-slate-400">{progressLabel}</span>
                       <span className="text-slate-400 font-mono">{progress}%</span>
                     </div>
-                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={progress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={progressLabel || 'Progress'}
+                    >
                       <div
                         className={cn(
                           "h-full rounded-full transition-all duration-500",
@@ -230,7 +247,27 @@ export default function BacktestPage() {
                 <CardTitle className="text-sm font-bold uppercase tracking-widest text-slate-400">Simulation History</CardTitle>
                 <CardDescription>Previous backtest results</CardDescription>
               </div>
-              <Button variant="outline" size="sm" className="border-border hover:bg-accent">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-border hover:bg-accent"
+                onClick={async () => {
+                  try {
+                    const data = await apiClient.getBacktestResults();
+                    if (data.length === 0) return;
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `backtest-results-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    // export failed silently
+                  }
+                }}
+                disabled={!history || history.length === 0}
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>
@@ -253,10 +290,16 @@ export default function BacktestPage() {
                     ) : history && Array.isArray(history) && history.length > 0 ? (
                       history.map((result, i) => (
                         <TableRow key={i} className="border-border hover:bg-accent/50 transition-colors">
-                          <TableCell className="font-bold text-foreground">XAUUSD</TableCell>
-                          <TableCell className="text-green-400 font-mono">{(result.win_rate * 100).toFixed(1)}%</TableCell>
-                          <TableCell className="text-blue-400 font-mono">{result.profit_factor.toFixed(2)}</TableCell>
-                          <TableCell className="text-right text-card-foreground font-black">${result.net_profit.toLocaleString()}</TableCell>
+                          <TableCell className="font-bold text-foreground">{asset.toUpperCase()}</TableCell>
+                          <TableCell className="text-green-400 font-mono">
+                            {result.win_rate != null ? `${(result.win_rate * 100).toFixed(1)}%` : '—'}
+                          </TableCell>
+                          <TableCell className="text-blue-400 font-mono">
+                            {result.profit_factor != null ? result.profit_factor.toFixed(2) : '—'}
+                          </TableCell>
+                          <TableCell className="text-right text-card-foreground font-black">
+                            {result.net_profit != null ? `$${result.net_profit.toLocaleString()}` : '—'}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">

@@ -60,12 +60,17 @@ class ModelRetrainer:
         # Load outcomes
         outcomes = self._load_outcomes(days=30)
         if len(outcomes) < 50:
+            logger.info(f"Not enough outcomes for retrain: {len(outcomes)}/50 minimum")
             return {'success': False, 'reason': 'Not enough outcomes'}
         
-        # Load current model
-        model_path = self.models_dir / f'{asset}_enhanced_15m.pkl'
+        # Load current model — prefer V5, fallback to V4
+        model_path = self.models_dir / f'{asset}_v5.pkl'
         if not model_path.exists():
-            return {'success': False, 'reason': f'Model not found: {model_path}'}
+            model_path = self.models_dir / f'{asset}_regression_system.pkl'
+        if not model_path.exists():
+            model_path = self.models_dir / f'{asset}_enhanced_15m.pkl'
+        if not model_path.exists():
+            return {'success': False, 'reason': f'Model not found for {asset}'}
         
         try:
             with open(model_path, 'rb') as f:

@@ -70,10 +70,10 @@ export default function PipelineSummary() {
     return (
       <div className="flex flex-wrap items-center gap-4 px-4 py-1.5 border-b border-terminal-rule bg-terminal-panel overflow-x-auto">
         <StatusPill label="PIPELINE"   value="OFFLINE"   ok={false} />
-        <StatusPill label="XAU DATA"   value="CACHED · 47,321 rows" ok={true} />
-        <StatusPill label="XAG DATA"   value="CACHED · 47,891 rows" ok={true} />
-        <StatusPill label="XAU MODEL"  value="v2.4.1 · LOADED"      ok={true} />
-        <StatusPill label="XAG MODEL"  value="v2.4.1 · LOADED"      ok={true} />
+        <StatusPill label="XAU DATA"   value="UNKNOWN"   neutral />
+        <StatusPill label="XAG DATA"   value="UNKNOWN"   neutral />
+        <StatusPill label="XAU MODEL"  value="UNKNOWN"   neutral />
+        <StatusPill label="XAG MODEL"  value="UNKNOWN"   neutral />
         <StatusPill label="FEATURES"   value="89"    neutral />
         <StatusPill label="FRAMEWORK"  value="XGBoost + SMC" neutral />
         <div className="ml-auto flex items-center gap-1.5">

@@ -5,35 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useWebSocket } from '@/lib/hooks/useWebSocket';
-
-const SHAP_LABELS: Record<string, string> = {
-  htf_1h_dist_low: 'Dist. Recent Low',
-  htf_1h_dist_high: 'Dist. Recent High',
-  htf_1h_momentum: '1H Momentum',
-  htf_1h_atr: '1H Volatility',
-  premium_discount_position: 'Prem/Disc Zone',
-  distance_from_equilibrium: 'Fair Value Dist.',
-  VWAPd_4: 'VWAP Dev. S',
-  VWAPd_16: 'VWAP Dev. M',
-  VWAPd_96: 'VWAP Dev. L',
-  CVD_4: 'Order Flow S',
-  CVD_16: 'Order Flow M',
-  CVD_96: 'Order Flow L',
-  session_ny: 'NY Session',
-  session_london: 'London Session',
-  session_asia: 'Asia Session',
-  session_overlap: 'Session Overlap',
-  Ret_4: 'Return S',
-  Ret_16: 'Return M',
-  Ret_96: 'Return L',
-  Imbal_4: 'Imbalance S',
-  Imbal_16: 'Imbalance M',
-  Imbal_96: 'Imbalance L',
-  close: 'Last Close',
-  high: 'Session High',
-  low: 'Session Low',
-  volume: 'Volume',
-};
+import { SHAP_LABELS } from '@/lib/shap-labels';
 
 function label(raw: string) {
   return SHAP_LABELS[raw] ?? raw.replace(/_/g, ' ').toUpperCase().slice(0, 18);

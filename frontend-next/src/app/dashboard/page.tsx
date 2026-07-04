@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { usePredictions } from '@/lib/hooks/usePredictions';
@@ -13,15 +12,6 @@ import { AssetType } from '@/lib/api-types';
 import { apiClient } from '@/lib/api-client';
 import { RefreshCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const SHAPExplainer = dynamic(() => import('@/components/Dashboard/SHAPExplainer'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-40 w-full bg-terminal-panel border border-terminal-rule flex items-center justify-center">
-      <p className="text-terminal-label font-mono text-[10px] tracking-widest">LOADING SHAP...</p>
-    </div>
-  ),
-});
 
 // Static mock used when backend is offline (preview / no API)
 const MOCK_PREDICTIONS: Record<AssetType, import('@/lib/api-types').PredictionItem> = {
@@ -67,6 +57,7 @@ export default function DashboardPage() {
   // Fall back to static mock when API is unreachable (offline / preview mode)
   const apiPrediction = rawPrediction?.predictions?.slice(-1)[0];
   const prediction = apiPrediction ?? ((!isLoading || isError) ? MOCK_PREDICTIONS[activeAsset] : undefined);
+  const isUsingMock = !apiPrediction && prediction !== undefined;
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const { status } = useSession();
 
@@ -102,13 +93,14 @@ export default function DashboardPage() {
       {/* ── Zone 1: Ticker/status bar ── */}
       <div className="flex items-center justify-between border-b border-terminal-rule bg-terminal-panel px-4 py-2 mb-0">
         {/* Asset selector */}
-        <div className="flex items-center gap-0">
+        <div className="flex items-center gap-0" role="tablist" aria-label="Asset selector">
           {(['gold', 'silver'] as AssetType[]).map((asset) => (
             <button
               key={asset}
               onClick={() => setActiveAsset(asset)}
+              role="tab"
+              aria-selected={activeAsset === asset}
               aria-label={`Switch to ${asset === 'gold' ? 'Gold XAU/USD' : 'Silver XAG/USD'}`}
-              aria-pressed={activeAsset === asset}
               className={cn(
                 'px-3 py-1 text-[10px] font-mono font-bold tracking-[0.2em] uppercase transition-all border-b-2',
                 activeAsset === asset
@@ -165,11 +157,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {status === 'unauthenticated' && (
+      {(status === 'unauthenticated' || isUsingMock) && (
         <div className="flex items-center gap-2 border-b border-terminal-rule px-4 py-1.5 bg-terminal-hold/5">
           <span className="w-1.5 h-1.5 bg-terminal-hold rounded-full" />
           <p className="text-[9px] font-mono text-terminal-hold tracking-widest">
-            PREVIEW MODE — SIGN IN TO ACCESS WATCHLIST AND SAVED PREFERENCES
+            {status === 'unauthenticated'
+              ? 'PREVIEW MODE — SIGN IN TO ACCESS WATCHLIST AND SAVED PREFERENCES'
+              : 'API OFFLINE — SHOWING DEMO DATA'}
           </p>
         </div>
       )}
@@ -189,31 +183,6 @@ export default function DashboardPage() {
               isLoading={isLoading && !isError && !prediction}
               livePrice={livePrice}
             />
-
-            {prediction && prediction.shap_values && prediction.shap_values.length > 0 && (
-              <>
-                <div className="border-t border-terminal-rule pt-3">
-                  <p className="text-[9px] font-mono font-bold text-terminal-label tracking-widest mb-2">
-                    INSIGHT
-                  </p>
-                  <p className="text-[11px] font-mono text-terminal-label leading-relaxed">
-                    {(() => {
-                      const top = [...prediction.shap_values]
-                        .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
-                        .slice(0, 3);
-                      const bullish = top.filter(f => f.contribution > 0);
-                      const bearish = top.filter(f => f.contribution < 0);
-                      const parts: string[] = [];
-                      if (bullish.length > 0) parts.push(`Bullish: ${bullish.map(f => f.feature.replace(/_/g, ' ')).join(', ')}`);
-                      if (bearish.length > 0) parts.push(`Bearish: ${bearish.map(f => f.feature.replace(/_/g, ' ')).join(', ')}`);
-                      return parts.join(' · ') || 'Analyzing market conditions...';
-                    })()}
-                  </p>
-                </div>
-
-                <SHAPExplainer prediction={prediction} />
-              </>
-            )}
           </div>
         </div>
 

@@ -5,7 +5,7 @@ Signal Retriever - searches for similar past signals and adjusts confidence.
 import logging
 from typing import Dict, Any, List, Optional
 from .client import SignalMemoryClient
-from .embedder import SignalEmbedder
+from .embedder import SignalEmbedder, ChromaDBEmbeddingFunction
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +20,7 @@ class SignalRetriever:
     
     def get_collection(self):
         """Get the signal patterns collection."""
-        return self.client.get_collection(
-            self.collection_name,
-            embedding_function=self.embedder.get_model()
-        )
+        return self.client.get_collection(self.collection_name)
     
     def find_similar(self, signal_data: Dict[str, Any], n_results: int = 5) -> List[Dict[str, Any]]:
         """

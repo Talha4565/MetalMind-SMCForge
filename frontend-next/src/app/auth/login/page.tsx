@@ -64,12 +64,12 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Theme toggle â€” top right */}
+      {/* Theme toggle — top right */}
       <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
       </div>
 
-      {/* Left â€” Form */}
+      {/* Left — Form */}
       <div className="flex flex-1 items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           {/* Brand */}
@@ -109,12 +109,21 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right â€” Brand panel (hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-muted/30 border-l border-border">
-        <div className="max-w-md space-y-12 px-12">
+      {/* Right — Brand panel (hidden on mobile) */}
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-muted/30 border-l border-border relative overflow-hidden">
+        {/* Subtle background texture */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        />
+
+        <div className="relative max-w-md space-y-10 px-12">
 
           <div className="relative space-y-6">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-accent/30 w-fit">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-sm w-fit">
               <Zap className="w-3 h-3 text-emerald-400" aria-hidden="true" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
                 AI-powered signals
@@ -133,23 +142,31 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Stats */}
+          {/* Assets row */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-3xl font-black font-mono text-card-foreground">XAU</p>
+              <p className="text-3xl font-black font-mono text-card-foreground tabular-nums">XAU</p>
               <p className="text-[10px] uppercase tracking-widest text-emerald-400 mt-1">Gold</p>
             </div>
             <div>
-              <p className="text-3xl font-black font-mono text-card-foreground">XAG</p>
+              <p className="text-3xl font-black font-mono text-card-foreground tabular-nums">XAG</p>
               <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Silver</p>
             </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-white/10" />
+
+          {/* Product stats row */}
+          <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-3xl font-black font-mono text-emerald-400">90</p>
+              <p className="text-3xl font-black font-mono text-emerald-400 tabular-nums">90</p>
               <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Features</p>
             </div>
             <div>
-              <p className="text-3xl font-black font-mono text-emerald-400">86%</p>
+              <p className="text-3xl font-black font-mono text-emerald-400 tabular-nums">86%</p>
               <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Accuracy</p>
+              <p className="text-[9px] text-slate-500 mt-1.5 leading-snug">*Backtested, XAU/USD, 6 months</p>
             </div>
           </div>
         </div>
