@@ -89,6 +89,24 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
         </div>
       </div>
 
+      {/* TP/SL row */}
+      {(current.tp_price != null || current.sl_price != null) && (
+        <div className="grid grid-cols-2 gap-px bg-terminal-rule">
+          <div className="bg-terminal-panel px-3 py-2">
+            <p className="text-[8px] font-mono text-terminal-label tracking-widest mb-1">TAKE PROFIT</p>
+            <p className="text-[14px] font-mono font-black text-terminal-buy tabular-nums">
+              ${current.tp_price != null ? current.tp_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </p>
+          </div>
+          <div className="bg-terminal-panel px-3 py-2">
+            <p className="text-[8px] font-mono text-terminal-label tracking-widest mb-1">STOP LOSS</p>
+            <p className="text-[14px] font-mono font-black text-terminal-sell tabular-nums">
+              ${current.sl_price != null ? current.sl_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Connection status */}
       <div className="flex items-center gap-1.5 px-1">
         {isConnected

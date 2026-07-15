@@ -74,6 +74,8 @@ export interface PredictionItem {
   high?: number;
   low?: number;
   close?: number;
+  tp_price?: number;
+  sl_price?: number;
   timestamp: string;
   shap_values: SHAPValue[];
 }

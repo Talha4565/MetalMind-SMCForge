@@ -859,11 +859,17 @@ def get_latest_predictions():
             traceback.print_exc()
         
         # Prepare response
+        tp_pct = 0.0045 if asset == 'gold' else 0.003
+        sl_pct = 0.0015 if asset == 'gold' else 0.001
         results = []
         for i, (idx, row) in enumerate(recent_data.iterrows()):
             # Use real SHAP for latest bar, placeholder for others
             bar_shap = shap_values_for_response[-1] if i == len(recent_data) - 1 else shap_values_for_response[0]
-            
+
+            entry_price = float(row['close'])
+            tp_price = round(entry_price * (1 + tp_pct), 2)
+            sl_price = round(entry_price * (1 - sl_pct), 2)
+
             results.append({
                 'timestamp': idx.isoformat(),
                 'asset': asset.upper(),
@@ -875,6 +881,8 @@ def get_latest_predictions():
                 'signal': int(predictions[i]),
                 'probability': float(probabilities[i]),
                 'confidence': float(probabilities[i]), # FIXED: Expected by frontend (prediction.confidence)
+                'tp_price': tp_price,
+                'sl_price': sl_price,
                 'shap_values': bar_shap
             })
         
