@@ -330,68 +330,158 @@ class PipelineStatusTracker:
 
 class PipelineOrchestrator:
     """Main orchestrator that ties freshness, versioning, health, and status together."""
-    
+
     def __init__(self):
         self.freshness = DataFreshnessChecker(max_age_hours=25)
         self.versioning = ModelVersionManager()
         self.health = HealthMonitor()
         self.status = PipelineStatusTracker()
-    
-    def run_update(self, asset: str) -> bool:
-        """Run data update with health tracking."""
+
+    def run_update(self, asset: str) -> Dict[str, Any]:
+        """
+        Run data update with health tracking.
+
+        Fetches latest candles from MT5 and appends to CSV files.
+
+        Args:
+            asset: 'gold' or 'silver'
+
+        Returns:
+            Dict with 'success', 'freshness', 'records_added', 'error'
+        """
         job_id = f'{asset}_update'
         self.status.update_job_status(job_id, 'running')
-        
+
+        result = {
+            'success': False,
+            'asset': asset,
+            'freshness': None,
+            'records_added': 0,
+            'error': None,
+        }
+
         try:
             from run_pipeline import run_fetch_and_append
-            run_fetch_and_append(asset)
-            
+            fetch_result = run_fetch_and_append(asset)
+
+            result['records_added'] = fetch_result.get('records_added', 0)
+
+            if not fetch_result.get('success'):
+                result['error'] = fetch_result.get('error', 'Fetch failed')
+                self.health.record_update(success=False, error=result['error'])
+                self.status.update_job_status(job_id, 'failed', error=result['error'])
+                return result
+
             # Check freshness after update
             freshness = self.freshness.check(asset)
+            result['freshness'] = freshness
+            result['success'] = freshness['is_fresh']
+
             self.health.record_update(
                 success=freshness['is_fresh'],
                 error=freshness['message'] if not freshness['is_fresh'] else None
             )
-            self.status.update_job_status(job_id, 'success', result=freshness)
-            
-            return True
+            self.status.update_job_status(job_id, 'success', result={
+                'freshness': freshness,
+                'records_added': result['records_added'],
+            })
+
+            logger.info(f"✓ {asset} update complete: {freshness['message']}")
+            return result
+
         except Exception as e:
-            self.health.record_update(success=False, error=str(e))
-            self.status.update_job_status(job_id, 'failed', error=str(e))
-            return False
-    
-    def run_retrain(self, asset: str, trials: int = 10) -> bool:
-        """Run retrain with backup and health tracking."""
+            error_msg = str(e)
+            logger.error(f"Update failed for {asset}: {error_msg}")
+            result['error'] = error_msg
+            self.health.record_update(success=False, error=error_msg)
+            self.status.update_job_status(job_id, 'failed', error=error_msg)
+            return result
+
+    def run_retrain(self, asset: str, trials: int = 10) -> Dict[str, Any]:
+        """
+        Run retrain with backup and health tracking.
+
+        Creates backup of current model, retrains on fresh data,
+        and rolls back if retrain fails.
+
+        Args:
+            asset: 'gold' or 'silver'
+            trials: Number of Optuna hyperparameter trials
+
+        Returns:
+            Dict with 'success', 'accuracy', 'model_path', 'error'
+        """
         job_id = f'{asset}_retrain'
         self.status.update_job_status(job_id, 'running')
-        
+
+        result = {
+            'success': False,
+            'asset': asset,
+            'accuracy': None,
+            'model_path': None,
+            'error': None,
+        }
+
         try:
             # Create backup before retraining
-            self.versioning.create_backup(asset)
-            
+            backup_path = self.versioning.create_backup(asset)
+            if backup_path:
+                logger.info(f"Backup created: {backup_path}")
+
             # Run retrain
             from models.retrain import retrain_model
-            result = retrain_model(asset, trials)
-            
-            success = result.get('status') == 'success'
-            self.health.record_retrain(
-                success=success,
-                error=result.get('error'),
-                metrics={'accuracy': result.get('accuracy')}
-            )
-            self.status.update_job_status(job_id, 'success', result=result)
-            
-            return success
+            retrain_result = retrain_model(asset, trials)
+
+            success = retrain_result.get('status') == 'success'
+            result['success'] = success
+            result['accuracy'] = retrain_result.get('accuracy')
+            result['model_path'] = retrain_result.get('model_path')
+
+            if success:
+                self.health.record_retrain(
+                    success=True,
+                    metrics={'accuracy': result['accuracy']}
+                )
+                self.status.update_job_status(job_id, 'success', result=retrain_result)
+                logger.info(f"✓ Retrain complete: accuracy={result['accuracy']:.2%}")
+            else:
+                error_msg = retrain_result.get('error', 'Retrain returned non-success status')
+                result['error'] = error_msg
+                self.health.record_retrain(success=False, error=error_msg)
+                self.status.update_job_status(job_id, 'failed', error=error_msg)
+
+                # Rollback on failure
+                logger.error(f"Retrain failed, rolling back {asset}...")
+                self.versioning.rollback(asset)
+
+            return result
+
         except Exception as e:
-            self.health.record_retrain(success=False, error=str(e))
-            self.status.update_job_status(job_id, 'failed', error=str(e))
-            
+            error_msg = str(e)
+            logger.error(f"Retrain failed for {asset}: {error_msg}")
+            result['error'] = error_msg
+            self.health.record_retrain(success=False, error=error_msg)
+            self.status.update_job_status(job_id, 'failed', error=error_msg)
+
             # Rollback on failure
-            logger.error(f"Retrain failed, rolling back {asset}...")
             self.versioning.rollback(asset)
-            
-            return False
-    
+
+            return result
+
+    def run_all_updates(self) -> Dict[str, Any]:
+        """Run updates for all assets and return summary."""
+        results = {}
+        for asset in ['gold', 'silver']:
+            results[asset] = self.run_update(asset)
+        return results
+
+    def run_all_retrains(self, trials: int = 10) -> Dict[str, Any]:
+        """Retrain all assets and return summary."""
+        results = {}
+        for asset in ['gold', 'silver']:
+            results[asset] = self.run_retrain(asset, trials)
+        return results
+
     def get_dashboard_data(self) -> Dict[str, Any]:
         """Get all data needed for pipeline dashboard."""
         return {

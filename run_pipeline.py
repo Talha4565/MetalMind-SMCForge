@@ -39,35 +39,82 @@ def run_fetch_and_append(asset: str, intervals: list = None):
     """Fetch live data and append to CSVs using MT5.
     
     Requires MetaTrader 5 terminal running on the host.
+    Called by orchestrator.run_update() and etl_monitor.py.
+    
+    Returns:
+        dict with 'success', 'records_added', 'error' keys
     """
     if intervals is None:
-        intervals = ['5m', '15m', '30m', '1h']
+        intervals = ['15m']  # Default to 15m for quick updates
     
     logger.info("=" * 60)
     logger.info(f"FETCH & APPEND: {asset.upper()}")
     logger.info("=" * 60)
     
+    result = {
+        'success': False,
+        'asset': asset,
+        'records_added': 0,
+        'error': None,
+        'timestamp': datetime.now().isoformat(),
+    }
+    
     try:
         import MetaTrader5 as mt5
-        if mt5.initialize():
-            logger.info("MT5 available, using MT5 for data fetch")
-            mt5.shutdown()
-            import subprocess
-            result = subprocess.run(
-                [sys.executable, 'scripts/mt5_update.py', '--asset', asset],
-                capture_output=True, text=True, cwd=str(Path(__file__).parent)
-            )
-            if result.returncode == 0:
-                logger.info(f"✓ {asset.upper()} data updated via MT5")
-                return
-            else:
-                logger.error(f"MT5 update failed: {result.stderr}")
+        if not mt5.initialize():
+            error_msg = f"MT5 initialize failed: {mt5.last_error()}"
+            logger.error(error_msg)
+            result['error'] = error_msg
+            return result
+        
+        logger.info("MT5 connected successfully")
+        mt5.shutdown()
+        
+        # Run the MT5 data update script
+        import subprocess
+        cmd = [sys.executable, 'scripts/mt5_data_update.py', '--intervals'] + intervals
+        if asset:
+            cmd.extend(['--asset', asset])
+        
+        proc = subprocess.run(
+            cmd,
+            capture_output=True, text=True, 
+            cwd=str(Path(__file__).parent),
+            timeout=120  # 2 minute timeout
+        )
+        
+        if proc.returncode == 0:
+            logger.info(f"✓ {asset.upper()} data updated via MT5")
+            result['success'] = True
+            # Parse output to get record count
+            for line in proc.stdout.split('\n'):
+                if 'new' in line and 'dupes' in line:
+                    try:
+                        # Format: "  Gold_15m_Candlestick.csv: +100 new, 50 dupes, total 55700 rows"
+                        parts = line.split('+')
+                        if len(parts) > 1:
+                            result['records_added'] = int(parts[1].split('new')[0].strip())
+                    except:
+                        pass
         else:
-            logger.error(f"MT5 initialize failed: {mt5.last_error()}")
+            error_msg = f"MT5 update failed: {proc.stderr}"
+            logger.error(error_msg)
+            result['error'] = error_msg
+        
     except ImportError:
-        logger.error("MetaTrader5 not installed. Run: pip install MetaTrader5")
+        error_msg = "MetaTrader5 not installed. Run: pip install MetaTrader5"
+        logger.error(error_msg)
+        result['error'] = error_msg
+    except subprocess.TimeoutExpired:
+        error_msg = "MT5 update timed out after 120 seconds"
+        logger.error(error_msg)
+        result['error'] = error_msg
     except Exception as e:
-        logger.error(f"MT5 error: {e}")
+        error_msg = f"MT5 error: {e}"
+        logger.error(error_msg)
+        result['error'] = error_msg
+    
+    return result
 
 
 def run_backfill(asset: str):

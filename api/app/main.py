@@ -533,6 +533,9 @@ class BacktestManager:
                     'max_drawdown': metrics.get('max_drawdown_pct', 0),
                     'total_trades': metrics.get('n_trades', 0),
                     'net_profit': metrics.get('total_return_usd', 0),
+                    'sharpe_ratio': metrics.get('sharpe_ratio', 0),
+                    'sortino_ratio': metrics.get('sortino_ratio', 0),
+                    'calmar_ratio': metrics.get('calmar_ratio', 0),
                     'trades': trades_list,
                     'asset': asset,
                 }
@@ -819,23 +822,41 @@ def get_latest_predictions():
                     predictions[i] = 0   # HOLD
         
         # Compute real SHAP values for the latest bar
-        shap_values_for_response = [{'feature': 'N/A', 'contribution': 0.0}] * len(predictions)
+        default_shap = [{'feature': 'N/A', 'contribution': 0.0}]
+        shap_values_for_response = [default_shap] * len(predictions)
         try:
             if SHAP_AVAILABLE and len(X) > 0:
-                explainer = shap.TreeExplainer(model)
+                # Try to create explainer - handle different model types
+                try:
+                    explainer = shap.TreeExplainer(model)
+                except Exception:
+                    # Fallback for models that don't support TreeExplainer
+                    logger.warning("TreeExplainer failed, trying KernelExplainer")
+                    explainer = shap.KernelExplainer(model.predict, shap.sample(X, 100))
+                
                 latest_bar = X.iloc[[-1]]
                 shap_vals = explainer.shap_values(latest_bar)
+                
+                # Handle different SHAP output formats
                 if isinstance(shap_vals, list):
-                    shap_vals = shap_vals[1]
-                shap_vals = shap_vals[0]
+                    shap_vals = shap_vals[1]  # Binary classification - use positive class
+                if isinstance(shap_vals, np.ndarray) and shap_vals.ndim > 1:
+                    shap_vals = shap_vals[0]
+                
+                # Get top 5 features by absolute SHAP value
                 top_idx = np.argsort(np.abs(shap_vals))[::-1][:5]
                 top_shap = [
                     {'feature': X.columns[j], 'contribution': float(shap_vals[j])}
                     for j in top_idx
                 ]
-                shap_values_for_response[-1] = top_shap
+                
+                # Assign to all bars (same model, same features)
+                shap_values_for_response = [top_shap] * len(predictions)
+                logger.info(f"✅ SHAP computed: {len(top_shap)} features")
         except Exception as e:
-            logger.warning(f"SHAP computation failed for prediction: {e}")
+            logger.warning(f"SHAP computation failed: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Prepare response
         results = []
@@ -888,9 +909,9 @@ def get_latest_predictions():
                 # Add key SHAP features for embedding (ensure list type)
                 shap_raw = latest.get('shap_values', [])
                 if isinstance(shap_raw, list):
-                    for shap in shap_raw[:5]:
-                        if isinstance(shap, dict):
-                            signal_features[str(shap.get('feature', 'unknown'))] = float(shap.get('contribution', 0))
+                    for shap_item in shap_raw[:5]:
+                        if isinstance(shap_item, dict):
+                            signal_features[str(shap_item.get('feature', 'unknown'))] = float(shap_item.get('contribution', 0))
                 
                 signal_updater.store_signal(signal_features)
             except Exception as e:
@@ -1038,12 +1059,16 @@ def get_prediction_history():
         days = max(1, min(days, 90))
         limit = max(1, min(limit, 1000))
 
-        history = prediction_logger.get_history(days=days, asset=asset, limit=limit)
+        # Get all records first (no limit), then filter, then apply limit
+        history = prediction_logger.get_history(days=days, asset=asset, limit=10000)
         # Filter out HOLD signals — only show actionable trades (BUY/SELL)
         history = [r for r in history if r.get('signal') != 0]
         
         # Sort by timestamp descending (newest first)
         history.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
+        
+        # Apply limit after filtering
+        history = history[:limit]
         
         summary = prediction_logger.get_summary(days=days)
 
@@ -1267,15 +1292,42 @@ def get_shap_feature_importance(current_user_email):
 @app.route('/api/shap/plot', methods=['GET'])
 @token_required
 def get_shap_plot(current_user_email):
-    """Serve SHAP feature importance plot."""
+    """Serve SHAP feature importance plot. Auto-generates on first request."""
     try:
-        project_root = Path(__file__).parent.parent.parent
-        plot_file = project_root / 'reports' / 'shap_plots' / 'feature_importance.png'
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
         
-        if plot_file.exists():
-            return send_file(plot_file, mimetype='image/png')
-        else:
-            return jsonify({'error': 'SHAP plot not found'}), 404
+        project_root = Path(__file__).parent.parent.parent
+        plot_dir = project_root / 'reports' / 'shap_plots'
+        plot_file = plot_dir / 'feature_importance.png'
+        
+        if not plot_file.exists():
+            # Auto-generate from cached SHAP data
+            asset = request.args.get('asset', 'gold')
+            shap_data = shap_cache.get(asset)
+            features = shap_data.get('feature_importance', [])
+            
+            if not features:
+                return jsonify({'error': 'No SHAP data available'}), 404
+            
+            plot_dir.mkdir(parents=True, exist_ok=True)
+            
+            names = [f['feature'] for f in features[:15]][::-1]
+            values = [f['importance'] for f in features[:15]][::-1]
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.barh(names, values, color='#10b981')
+            ax.set_xlabel('Mean |SHAP Value|')
+            ax.set_title(f'SHAP Feature Importance — {asset.upper()}')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(plot_file, dpi=150, bbox_inches='tight')
+            plt.close(fig)
+            logger.info(f"SHAP plot generated: {plot_file}")
+        
+        return send_file(plot_file, mimetype='image/png')
     
     except Exception as e:
         logger.error(f"Error serving SHAP plot: {e}")
@@ -1507,11 +1559,18 @@ def generate_predictions_for_asset(asset: str) -> Dict[str, Any]:
             return None
 
         if feature_names:
-            available_features = [f for f in feature_names if f in df.columns]
-            if not available_features:
+            # Create DataFrame with exactly the features the model expects
+            # Missing features are filled with 0, extra features are dropped
+            X = pd.DataFrame(index=df.index)
+            for feat in feature_names:
+                if feat in df.columns:
+                    X[feat] = df[feat]
+                else:
+                    X[feat] = 0.0  # Fill missing features with 0
+            
+            if X.empty:
                 logger.warning(f"No matching features found for asset {asset}")
                 return None
-            X = df[available_features]
         else:
             X = df.select_dtypes(include=['float64', 'int64'])
 

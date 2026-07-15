@@ -47,84 +47,65 @@ class ModelRetrainer:
     
     def retrain_model(self, asset: str = 'gold') -> Dict[str, Any]:
         """
-        Retrain model with outcome-weighted samples.
+        Retrain model using the full training pipeline.
+        
+        Delegates to models/retrain.py which handles:
+        - Fresh data loading and feature engineering
+        - Optuna hyperparameter tuning
+        - Model training with proper train/val/test split
+        - Model artifact saving
         
         Returns:
             Dict with retrain results
         """
         from self_learning.tracker import OutcomeTracker
+        from models.retrain import retrain_model as full_retrain
         
         logger.info(f"Starting retrain for {asset}...")
         tracker = OutcomeTracker()
         
-        # Load outcomes
+        # Log outcome context before retraining
         outcomes = self._load_outcomes(days=30)
-        if len(outcomes) < 50:
-            logger.info(f"Not enough outcomes for retrain: {len(outcomes)}/50 minimum")
-            return {'success': False, 'reason': 'Not enough outcomes'}
+        win_rate_before = tracker.get_summary(days=7)['win_rate']
+        feature_importance = tracker.get_feature_importance()
         
-        # Load current model — prefer V5, fallback to V4
-        model_path = self.models_dir / f'{asset}_v5.pkl'
-        if not model_path.exists():
-            model_path = self.models_dir / f'{asset}_regression_system.pkl'
-        if not model_path.exists():
-            model_path = self.models_dir / f'{asset}_enhanced_15m.pkl'
-        if not model_path.exists():
-            return {'success': False, 'reason': f'Model not found for {asset}'}
+        retrain_record = {
+            'timestamp': datetime.now().isoformat(),
+            'asset': asset,
+            'outcomes_available': len(outcomes),
+            'win_rate_before': win_rate_before,
+            'top_features': [f['feature'] for f in feature_importance[:5]],
+        }
         
         try:
-            with open(model_path, 'rb') as f:
-                model_data = pickle.load(f)
+            # Delegate to the full training pipeline
+            result = full_retrain(asset, n_trials=20)
             
-            if isinstance(model_data, dict):
-                model = model_data['model']
-                feature_names = model_data.get('features', None)
-            else:
-                model = model_data
-                feature_names = None
-            
-            # Calculate sample weights based on outcomes
-            # Wins get weight 1.5, losses get weight 0.5
-            # This makes the model pay more attention to winning patterns
-            weights = []
-            for outcome in outcomes:
-                if outcome.get('outcome') == 'WIN':
-                    weights.append(1.5)
-                elif outcome.get('outcome') == 'LOSS':
-                    weights.append(0.5)
-                else:
-                    weights.append(1.0)
-            
-            # Get feature importance from tracker
-            feature_importance = tracker.get_feature_importance()
-            
-            # Log the retrain
-            retrain_record = {
-                'timestamp': datetime.now().isoformat(),
-                'asset': asset,
-                'outcomes_used': len(outcomes),
-                'win_rate_before': tracker.get_summary(days=7)['win_rate'],
-                'weights_distribution': {
-                    'high_weight': sum(1 for w in weights if w > 1),
-                    'low_weight': sum(1 for w in weights if w < 1),
-                    'normal_weight': sum(1 for w in weights if w == 1),
-                },
-                'top_features': [f['feature'] for f in feature_importance[:5]],
-            }
+            retrain_record['status'] = result.get('status', 'unknown')
+            retrain_record['accuracy'] = result.get('accuracy')
+            retrain_record['model_path'] = result.get('model_path')
             
             with open(self.retrain_log, 'a') as f:
                 f.write(json.dumps(retrain_record) + '\n')
             
-            logger.info(f"Retrain completed for {asset}: {len(outcomes)} outcomes used")
+            logger.info(f"Retrain completed for {asset}: accuracy={result.get('accuracy', 'N/A')}")
             
             return {
-                'success': True,
+                'success': result.get('status') == 'success',
                 'asset': asset,
-                'outcomes_used': len(outcomes),
+                'accuracy': result.get('accuracy'),
+                'model_path': result.get('model_path'),
+                'outcomes_available': len(outcomes),
+                'win_rate_before': win_rate_before,
                 'feature_importance': feature_importance[:10],
             }
         
         except Exception as e:
+            retrain_record['status'] = 'failed'
+            retrain_record['error'] = str(e)
+            with open(self.retrain_log, 'a') as f:
+                f.write(json.dumps(retrain_record) + '\n')
+            
             logger.error(f"Retrain failed: {e}")
             return {'success': False, 'error': str(e)}
     

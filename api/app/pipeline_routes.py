@@ -7,11 +7,16 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime
 from pathlib import Path
 from api.app.auth import token_required
+from api.app.extensions import limiter
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
 pipeline_bp = Blueprint('pipeline', __name__, url_prefix='/api/pipeline')
+
+# Global state for async operations
+_running_jobs = {}
 
 
 def _check_data_freshness(asset: str) -> dict:
@@ -46,8 +51,6 @@ def _check_data_freshness(asset: str) -> dict:
 
 def _get_model_info(asset: str) -> dict:
     """Get model file info."""
-    from config.settings import MODEL_CONFIG
-
     if asset == 'gold':
         model_path = Path('models/gold_regression_system.pkl')
     else:
@@ -67,6 +70,7 @@ def _get_model_info(asset: str) -> dict:
 
 
 @pipeline_bp.route('/status', methods=['GET'])
+@limiter.limit("300 per hour")
 def get_pipeline_status():
     """Public pipeline status summary."""
     gold_fresh = _check_data_freshness('gold')
@@ -93,6 +97,7 @@ def get_pipeline_status():
 
 
 @pipeline_bp.route('/details', methods=['GET'])
+@limiter.limit("100 per hour")
 def get_pipeline_details():
     """Full pipeline details (admin)."""
     gold_fresh = _check_data_freshness('gold')
@@ -144,33 +149,83 @@ def get_pipeline_details():
 @pipeline_bp.route('/run', methods=['POST'])
 @token_required
 def trigger_pipeline_run(_email=None):
-    """Trigger manual pipeline run."""
+    """
+    Trigger manual pipeline run via orchestrator.
+    
+    Request body:
+        {"type": "update"|"retrain", "asset": "gold"|"silver"}
+    
+    Returns:
+        {"status": "completed"|"running", "result": {...}}
+    """
     try:
         data = request.json or {}
         pipeline_type = data.get('type', 'update')
         asset = data.get('asset', 'gold')
 
         if asset not in ['gold', 'silver']:
-            return jsonify({'error': 'Invalid asset'}), 400
+            return jsonify({'error': 'Invalid asset. Must be "gold" or "silver"'}), 400
 
-        import subprocess, sys
-        project_root = Path(__file__).parent.parent.parent
+        if pipeline_type not in ['update', 'retrain']:
+            return jsonify({'error': 'Invalid type. Must be "update" or "retrain"'}), 400
 
-        if pipeline_type == 'update':
-            cmd = [sys.executable, 'run_pipeline.py', '--mode', 'update', '--asset', asset]
-        elif pipeline_type == 'retrain':
-            cmd = [sys.executable, 'run_pipeline.py', '--mode', 'retrain', '--asset', asset]
-        else:
-            return jsonify({'error': 'Invalid pipeline type'}), 400
+        # Check if job already running
+        job_key = f'{asset}_{pipeline_type}'
+        if job_key in _running_jobs and _running_jobs[job_key].is_alive():
+            return jsonify({'status': 'running', 'message': f'{pipeline_type} already running for {asset}'}), 409
 
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(project_root), timeout=300)
+        from etl.orchestrator import PipelineOrchestrator
+        orch = PipelineOrchestrator()
 
-        if result.returncode == 0:
-            return jsonify({'status': 'completed', 'message': f'{pipeline_type} completed for {asset}'})
-        else:
-            return jsonify({'error': result.stderr or 'Pipeline failed'}), 500
+        def run_job():
+            try:
+                _running_jobs[job_key] = threading.current_thread()
+                if pipeline_type == 'update':
+                    result = orch.run_update(asset)
+                else:
+                    result = orch.run_retrain(asset, trials=20)
+                logger.info(f"Job {job_key} completed: {result}")
+            except Exception as e:
+                logger.error(f"Job {job_key} failed: {e}")
+            finally:
+                _running_jobs.pop(job_key, None)
 
-    except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Pipeline timed out'}), 500
+        thread = threading.Thread(target=run_job, daemon=True, name=job_key)
+        thread.start()
+
+        return jsonify({
+            'status': 'started',
+            'message': f'{pipeline_type} started for {asset}',
+            'job_key': job_key,
+        }), 202
+
+    except Exception as e:
+        logger.error(f"Pipeline trigger failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@pipeline_bp.route('/jobs', methods=['GET'])
+@token_required
+@limiter.limit("60 per hour")
+def get_running_jobs(_email=None):
+    """Get currently running pipeline jobs."""
+    jobs = {}
+    for key, thread in _running_jobs.items():
+        jobs[key] = {
+            'alive': thread.is_alive(),
+            'name': thread.name,
+        }
+    return jsonify({'running_jobs': jobs, 'count': len(jobs)})
+
+
+@pipeline_bp.route('/health', methods=['GET'])
+@limiter.limit("300 per hour")
+def get_pipeline_health():
+    """Get pipeline health status from orchestrator."""
+    try:
+        from etl.orchestrator import PipelineOrchestrator
+        orch = PipelineOrchestrator()
+        health = orch.health.get_status()
+        return jsonify(health)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
