@@ -116,6 +116,9 @@ export interface BacktestResponse {
   max_drawdown: number;
   total_trades: number;
   net_profit: number;
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  calmar_ratio: number;
   trades: Trade[];
 }
 

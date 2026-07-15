@@ -170,10 +170,20 @@ class ApiClient {
         max_drawdown: s.max_drawdown ?? s.max_drawdown_pct ?? 0,
         total_trades: s.total_trades ?? s.n_trades ?? 0,
         net_profit: s.net_profit ?? s.total_return_usd ?? 0,
+        sharpe_ratio: s.sharpe_ratio ?? 0,
+        sortino_ratio: s.sortino_ratio ?? 0,
+        calmar_ratio: s.calmar_ratio ?? 0,
         trades: data.trades || [],
       }];
     }
     return [];
+  }
+
+  async exportBacktest(format: 'csv' | 'pdf', type: string = 'all'): Promise<Blob> {
+    const response = await this.client.get(`/api/backtest/export?format=${format}&type=${type}`, {
+      responseType: 'blob',
+    });
+    return response.data;
   }
 
   // Pipeline

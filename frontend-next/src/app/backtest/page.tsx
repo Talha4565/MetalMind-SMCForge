@@ -253,13 +253,11 @@ export default function BacktestPage() {
                 className="border-border hover:bg-accent"
                 onClick={async () => {
                   try {
-                    const data = await apiClient.getBacktestResults();
-                    if (data.length === 0) return;
-                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const blob = await apiClient.exportBacktest('csv', 'all');
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `backtest-results-${new Date().toISOString().slice(0, 10)}.json`;
+                    a.download = `backtest-report-${new Date().toISOString().slice(0, 10)}.csv`;
                     a.click();
                     URL.revokeObjectURL(url);
                   } catch {

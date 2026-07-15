@@ -49,8 +49,8 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
 
   const Icon = isBuy ? TrendingUp : isSell ? TrendingDown : Minus;
 
-  const shap = current.shap_values ?? [];
-  const maxAbs = Math.max(...shap.map(s => Math.abs(s.contribution)), 0.001);
+  const shap = Array.isArray(current.shap_values) ? current.shap_values : [];
+  const maxAbs = shap.length > 0 ? Math.max(...shap.map(s => Math.abs(s.contribution)), 0.001) : 0.001;
   const topShap = [...shap].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 6);
 
   const displayPrice = livePrice ?? current.price;

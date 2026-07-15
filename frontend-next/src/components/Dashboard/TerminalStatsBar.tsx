@@ -47,12 +47,11 @@ export default function TerminalStatsBar({
   const assetFull  = activeAsset === 'gold' ? 'Gold Futures' : 'Silver Futures';
 
   // Derived from prediction shap if available
-  const shapCount = prediction?.shap_values?.length ?? 0;
-  const topDriverPos = prediction?.shap_values
-    ?.filter(s => s.contribution > 0)
+  const shapArr = Array.isArray(prediction?.shap_values) ? prediction.shap_values : [];
+  const shapCount = shapArr.length;
+  const topDriverPos = shapArr.filter(s => s.contribution > 0)
     .sort((a, b) => b.contribution - a.contribution)[0];
-  const topDriverNeg = prediction?.shap_values
-    ?.filter(s => s.contribution < 0)
+  const topDriverNeg = shapArr.filter(s => s.contribution < 0)
     .sort((a, b) => a.contribution - b.contribution)[0];
 
   return (

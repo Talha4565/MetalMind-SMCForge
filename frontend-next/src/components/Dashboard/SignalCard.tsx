@@ -48,8 +48,8 @@ export default function SignalCard({ prediction, isLoading, livePrice }: SignalC
       ? "text-red-500 bg-red-500/10 border-red-500/20"
       : "text-slate-400 bg-slate-400/10 border-slate-400/20";
 
-  const shapValues = currentPrediction.shap_values || [];
-  const maxAbs = Math.max(...shapValues.map(s => Math.abs(s.contribution)), 0.001);
+  const shapValues = Array.isArray(currentPrediction.shap_values) ? currentPrediction.shap_values : [];
+  const maxAbs = shapValues.length > 0 ? Math.max(...shapValues.map(s => Math.abs(s.contribution)), 0.001) : 0.001;
 
   return (
     <Card className={cn("bg-card border-border overflow-hidden group transition-all hover:border-border/80", {
