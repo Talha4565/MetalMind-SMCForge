@@ -102,7 +102,7 @@ class ApiClient {
 
   // Predictions
   async getLatestPrediction(asset: AssetType): Promise<PredictionResponse> {
-    const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`);
+    const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`, { timeout: 60000 });
     return response.data;
   }
 
