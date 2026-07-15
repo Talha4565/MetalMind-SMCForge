@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { usePredictions } from '@/lib/hooks/usePredictions';
+import { useWebSocket } from '@/lib/hooks/useWebSocket';
+import { PredictionItem } from '@/lib/api-types';
 import DashboardLayout from '@/components/Common/DashboardLayout';
 import TradingViewChart from '@/components/Charts/TradingViewChart';
 import PipelineSummary from '@/components/Dashboard/PipelineSummary';
@@ -54,12 +56,21 @@ const MOCK_PREDICTIONS: Record<AssetType, import('@/lib/api-types').PredictionIt
 export default function DashboardPage() {
   const [activeAsset, setActiveAsset] = useState<AssetType>('gold');
   const { data: rawPrediction, isLoading, isError, refetch, isRefetching } = usePredictions(activeAsset);
-  // Fall back to static mock when API is unreachable (offline / preview mode)
-  const apiPrediction = rawPrediction?.predictions?.slice(-1)[0];
-  const prediction = apiPrediction ?? ((!isLoading || isError) ? MOCK_PREDICTIONS[activeAsset] : undefined);
-  const isUsingMock = !apiPrediction && prediction !== undefined;
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const { status } = useSession();
+
+  // WebSocket as primary data source (real-time updates)
+  const { data: wsData, isConnected, emit } = useWebSocket<PredictionItem>('predictions');
+
+  // Use WebSocket data if available, otherwise use REST API, otherwise mock
+  const apiPrediction = rawPrediction?.predictions?.slice(-1)[0];
+  const wsPrediction = wsData?.asset === activeAsset ? wsData : null;
+  const prediction = wsPrediction ?? apiPrediction ?? ((!isLoading || isError) ? MOCK_PREDICTIONS[activeAsset] : undefined);
+  const isUsingMock = !wsPrediction && !apiPrediction && prediction !== undefined;
+
+  useEffect(() => {
+    if (isConnected) emit('subscribe_predictions', { asset: activeAsset });
+  }, [isConnected, activeAsset]);
 
   useEffect(() => {
     let mounted = true;
