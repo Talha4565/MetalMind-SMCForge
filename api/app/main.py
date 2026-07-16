@@ -1515,16 +1515,11 @@ def start_prediction_updates():
                 # Generate fresh predictions
                 try:
                     prediction_data = generate_predictions_for_asset(asset)
-                    if prediction_data:
-                        # Emit to all connected clients subscribed to this asset
-                        socketio.emit('predictions', {
-                            'asset': asset,
-                            'predictions': prediction_data['predictions'],
-                            'total_signals': prediction_data['total_signals'],
-                            'timestamp': datetime.now(timezone.utc).isoformat(),
-                            'price': prediction_data['current_price']
-                        })
-                        logger.debug(f"Emitted {asset} predictions to {len(connected_clients)} clients")
+                    if prediction_data and prediction_data['predictions']:
+                        # Emit the latest prediction as a PredictionItem (not the wrapper)
+                        latest = prediction_data['predictions'][-1]
+                        socketio.emit('predictions', latest)
+                        logger.debug(f"Emitted {asset} prediction to {len(connected_clients)} clients")
                 except Exception as e:
                     logger.error(f"Error generating predictions for {asset}: {e}")
                     

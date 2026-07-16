@@ -89,8 +89,8 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
         </div>
       </div>
 
-      {/* TP/SL row */}
-      {(current.tp_price != null || current.sl_price != null) && (
+      {/* TP/SL row — only show when signal is BUY or SELL */}
+      {signalLabel !== 'HOLD' && (current.tp_price != null || current.sl_price != null) && (
         <div className="grid grid-cols-2 gap-px bg-terminal-rule">
           <div className="bg-terminal-panel px-3 py-2">
             <p className="text-[8px] font-mono text-terminal-label tracking-widest mb-1">TAKE PROFIT</p>
