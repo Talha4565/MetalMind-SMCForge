@@ -413,6 +413,120 @@ def refresh_access_token():
     }), 200
 
 
+# ============================================================================
+# FORGOT PASSWORD ENDPOINTS
+# ============================================================================
+
+import hashlib
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("5 per hour")
+def forgot_password():
+    """
+    Send password reset email.
+
+    Security:
+    - Hashes token before storing in DB
+    - Doesn't reveal if email exists (prevents enumeration)
+    - Rate limited to 5/hour per IP
+    """
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        # Always return success to prevent email enumeration
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            # Generate secure token
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+            # Store hashed token with 1-hour expiry
+            from api.app.services.password_service import password_service
+            user.reset_token = token_hash
+            user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+            db.session.commit()
+
+            # Send email with raw token (not hash)
+            email_service.send_password_reset(email, raw_token)
+
+            logger.info(f"Password reset requested for {email}")
+
+        # Always return same message (don't reveal email existence)
+        return jsonify({'message': 'If email exists, reset link sent'}), 200
+
+    except Exception as e:
+        logger.error(f"Forgot password error: {e}")
+        return jsonify({'error': 'An error occurred'}), 500
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("10 per hour")
+def reset_password():
+    """
+    Reset password using token.
+
+    Security:
+    - Validates token hash against DB
+    - Checks token expiry
+    - Validates password strength
+    - Clears token after successful reset
+    """
+    try:
+        from api.app.services.password_service import password_service
+
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        new_password = data.get('password', '')
+
+        if not token or not new_password:
+            return jsonify({'error': 'Token and password are required'}), 400
+
+        # Validate password strength
+        is_strong, message = password_service.validate_strength(new_password)
+        if not is_strong:
+            return jsonify({'error': message}), 400
+
+        # Hash the incoming token to compare with stored hash
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        # Find user by hashed token
+        user = User.query.filter_by(reset_token=token_hash).first()
+
+        if not user:
+            return jsonify({'error': 'Invalid or expired token'}), 400
+
+        # Check expiry (timezone-aware comparison)
+        if user.reset_token_expires is None:
+            return jsonify({'error': 'Invalid token'}), 400
+
+        now = datetime.now(timezone.utc)
+        expires = user.reset_token_expires
+        # Ensure expiry is timezone-aware for comparison
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+
+        if expires < now:
+            return jsonify({'error': 'Token expired'}), 400
+
+        # Update password
+        user.password_hash = password_service.hash_password(new_password)
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.session.commit()
+
+        logger.info(f"Password reset successful for {user.email}")
+        return jsonify({'message': 'Password reset successful'}), 200
+
+    except Exception as e:
+        logger.error(f"Reset password error: {e}")
+        return jsonify({'error': 'An error occurred'}), 500
+
+
 # Initialize extensions correctly from shared instances
 def init_auth(app):
     """Initialize authentication module with Flask app."""

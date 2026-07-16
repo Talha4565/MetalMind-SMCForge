@@ -6,14 +6,36 @@ import { signIn } from 'next-auth/react';
 import { LoginForm } from '@/components/Auth/LoginForm';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { ArrowRight, Zap } from 'lucide-react';
 import ThemeToggle from '@/components/Common/ThemeToggle';
+import { Instrument_Serif, IBM_Plex_Mono } from 'next/font/google';
+
+const serif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
+  variable: '--font-serif',
+});
+
+const mono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-mono',
+});
 
 type LoginValues = {
   email: string;
   password: string;
   totp_code?: string;
 };
+
+// Static display data for the ticker strip — swap for a live feed later if desired.
+const TICKER_ITEMS = [
+  { label: 'XAU/USD', value: '3,412.85', delta: '+0.42%', up: true },
+  { label: 'XAG/USD', value: '38.91', delta: '-0.18%', up: false },
+  { label: 'DXY', value: '97.42', delta: '+0.09%', up: true },
+  { label: 'XAU/XAG', value: '87.71', delta: '+0.61%', up: true },
+  { label: 'MODEL', value: 'XG-7', delta: 'LOCKED', up: true },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -62,115 +84,94 @@ export default function LoginPage() {
     }
   };
 
+  const tickerLoop = [...TICKER_ITEMS, ...TICKER_ITEMS, ...TICKER_ITEMS];
+
   return (
-    <div className="flex min-h-screen">
-      {/* Theme toggle — top right */}
-      <div className="absolute top-4 right-4 z-50">
+    <div
+      className={`${serif.variable} ${mono.variable} relative min-h-screen overflow-hidden bg-[#0A0A0B] text-[#EDEAE3]`}
+    >
+      {/* Ticker strip — signature element, doubles as brand proof */}
+      <div className="relative overflow-hidden whitespace-nowrap border-b border-white/[0.06]">
+        <div
+          className="flex animate-[ticker_32s_linear_infinite] gap-10 px-6 py-2"
+          style={{ width: 'max-content', fontFamily: 'var(--font-mono)' }}
+        >
+          {tickerLoop.map((t, i) => (
+            <span key={i} className="flex items-center gap-2 text-[11px] tracking-wide text-[#8B9099]">
+              <span className="text-[#5C5C59]">{t.label}</span>
+              <span className="text-[#EDEAE3]">{t.value}</span>
+              <span className={t.up ? 'text-[#B8935A]' : 'text-[#8B9099]'}>{t.delta}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="absolute right-6 top-14 z-50">
         <ThemeToggle />
       </div>
 
-      {/* Left — Form */}
-      <div className="flex flex-1 items-center justify-center p-8">
-        <div className="w-full max-w-md space-y-8">
-          {/* Brand */}
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20">
-              <span className="text-white text-sm font-black">M</span>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-card-foreground">MetalMind</p>
-              <p className="text-[9px] font-medium uppercase tracking-widest text-slate-500">SMCForge</p>
-            </div>
-          </Link>
+      {/* Faint chart-grid backdrop, not a dot texture */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
+        style={{
+          backgroundImage:
+            'linear-gradient(#EDEAE3 1px, transparent 1px), linear-gradient(90deg, #EDEAE3 1px, transparent 1px)',
+          backgroundSize: '64px 64px',
+        }}
+      />
 
-          {/* Headline */}
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-card-foreground">
-              Welcome back
-            </h1>
-            <p className="text-sm text-slate-400 mt-2">
-              Sign in to access your trading signals and analytics.
+      <div className="relative flex flex-col items-center justify-center px-6 py-20">
+        {/* Registry / brand line */}
+        <div className="mb-10 flex items-center gap-3">
+          <span className="font-mono text-[10px] tracking-[0.3em] text-[#5C5C59]">No. 0X41</span>
+          <span className="h-3 w-px bg-white/10" />
+          <span className="font-mono text-[10px] tracking-[0.3em] text-[#B8935A]">SMC-90F</span>
+        </div>
+
+        <h1 className="mb-1 text-center text-5xl italic" style={{ fontFamily: 'var(--font-serif)' }}>
+          MetalMind
+        </h1>
+        <p className="mb-12 font-mono text-[10px] uppercase tracking-[0.35em] text-[#5C5C59]">
+          SMCForge — signal terminal
+        </p>
+
+        {/* Certificate-style card */}
+        <div className="relative w-full max-w-md">
+          <span className="absolute -left-px -top-px h-3 w-3 border-l border-t border-[#B8935A]" />
+          <span className="absolute -right-px -top-px h-3 w-3 border-r border-t border-[#B8935A]" />
+          <span className="absolute -bottom-px -left-px h-3 w-3 border-b border-l border-[#B8935A]" />
+          <span className="absolute -bottom-px -right-px h-3 w-3 border-b border-r border-[#B8935A]" />
+
+          <div className="border border-white/10 bg-[#131315] px-8 py-10">
+            <h2 className="mb-1 text-lg font-normal text-[#EDEAE3]">Sign in</h2>
+            <p className="mb-8 text-[13px] text-[#8B9099]">Access your signals, models and analytics.</p>
+
+            <LoginForm onSubmit={handleLogin} isLoading={isLoading} showOtp={requires2fa} />
+
+            <p className="mt-8 text-center text-[13px] text-[#8B9099]">
+              No account?{' '}
+              <Link href="/auth/register" className="text-[#B8935A] hover:text-[#D1AC79]">
+                Register
+              </Link>
             </p>
           </div>
-
-          {/* Form */}
-          <LoginForm
-            onSubmit={handleLogin}
-            isLoading={isLoading}
-            showOtp={requires2fa}
-          />
-
-          <p className="text-xs text-slate-400 text-center">
-            Don&apos;t have an account?{' '}
-            <Link href="/auth/register" className="text-emerald-400 hover:text-emerald-300 font-medium">
-              Create one
-            </Link>
-          </p>
         </div>
+
+        <p className="mt-10 font-mono text-[9px] uppercase tracking-[0.25em] text-[#454543]">
+          XGBoost · SHAP · ChromaDB · Walk-forward CV
+        </p>
       </div>
 
-      {/* Right — Brand panel (hidden on mobile) */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-muted/30 border-l border-border relative overflow-hidden">
-        {/* Subtle background texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-          }}
-        />
-
-        <div className="relative max-w-md space-y-10 px-12">
-
-          <div className="relative space-y-6">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] backdrop-blur-sm w-fit">
-              <Zap className="w-3 h-3 text-emerald-400" aria-hidden="true" />
-              <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
-                AI-powered signals
-              </span>
-            </div>
-
-            <h2 className="text-4xl font-black tracking-tight text-card-foreground leading-tight">
-              Trade with
-              <br />
-              <span className="text-emerald-400">machine precision</span>
-            </h2>
-
-            <p className="text-sm text-slate-300 leading-relaxed">
-              XGBoost models trained on 20 years of tick data.
-              SHAP explainability on every prediction.
-            </p>
-          </div>
-
-          {/* Assets row */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-3xl font-black font-mono text-card-foreground tabular-nums">XAU</p>
-              <p className="text-[10px] uppercase tracking-widest text-emerald-400 mt-1">Gold</p>
-            </div>
-            <div>
-              <p className="text-3xl font-black font-mono text-card-foreground tabular-nums">XAG</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Silver</p>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-white/10" />
-
-          {/* Product stats row */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <p className="text-3xl font-black font-mono text-emerald-400 tabular-nums">90</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Features</p>
-            </div>
-            <div>
-              <p className="text-3xl font-black font-mono text-emerald-400 tabular-nums">86%</p>
-              <p className="text-[10px] uppercase tracking-widest text-slate-300 mt-1">Accuracy</p>
-              <p className="text-[9px] text-slate-500 mt-1.5 leading-snug">*Backtested, XAU/USD, 6 months</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <style jsx global>{`
+        @keyframes ticker {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(-33.333%);
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -100,6 +100,16 @@ class ApiClient {
     return response.data;
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/auth/forgot-password', { email });
+    return response.data;
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/auth/reset-password', { token, password });
+    return response.data;
+  }
+
   // Predictions
   async getLatestPrediction(asset: AssetType): Promise<PredictionResponse> {
     const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`, { timeout: 60000 });
