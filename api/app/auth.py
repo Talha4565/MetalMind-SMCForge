@@ -157,18 +157,18 @@ def register():
         # Generate TOTP secret for 2FA
         totp_secret = pyotp.random_base32()
         
-        # Create user - auto-verify in development
+        # Create user - auto-verify in development for easier login
         is_dev = os.environ.get('FLASK_ENV') == 'development'
         new_user = User(
             email=email,
             password_hash=password_hash,
             totp_secret=totp_secret,
-            is_verified=is_dev  # Auto-verify in dev, require OTP in prod
+            is_verified=is_dev  # Auto-verify in dev so login works immediately
         )
         db.session.add(new_user)
         db.session.flush()  # Get user ID
         
-        # FIXED: Use centralized security service
+        # Generate OTP code
         otp_code = security_service.generate_otp()
         otp = OTPCode(
             user_id=new_user.id,
@@ -178,16 +178,23 @@ def register():
         db.session.add(otp)
         db.session.commit()
         
-        # Send OTP email (only in production)
-        if not is_dev:
+        # Always attempt to send OTP email (even in dev)
+        # In dev, email won't actually send but the flow is demonstrated
+        otp_sent = False
+        try:
             send_otp_email(email, otp_code)
+            otp_sent = True
+            logger.info(f"OTP email sent to {email}")
+        except Exception as e:
+            logger.warning(f"Could not send OTP email: {e}")
         
         return jsonify({
             'success': True,
-            'message': 'Registration successful.' + (' You can log in now.' if is_dev else ' Please verify your email with the OTP sent.'),
+            'message': 'Registration successful. Please verify your email with the OTP sent.',
             'email': email,
-            'otp_sent': not is_dev,
-            'dev_verified': is_dev
+            'otp_sent': otp_sent,
+            'dev_verified': is_dev,
+            'otp_code': otp_code if is_dev else None  # Return OTP in dev for testing
         }), 201
     
     except Exception as e:
