@@ -13,7 +13,10 @@ export function useAuthSync() {
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user?.accessToken) {
-      apiClient.setAccessToken(session.user.accessToken);
+      apiClient.setTokens(
+        session.user.accessToken,
+        session.user.refreshToken
+      );
     } else if (status === 'unauthenticated') {
       apiClient.clearAuth();
     }

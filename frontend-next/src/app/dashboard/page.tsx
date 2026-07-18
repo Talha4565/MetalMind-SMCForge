@@ -53,8 +53,11 @@ const MOCK_PREDICTIONS: Record<AssetType, import('@/lib/api-types').PredictionIt
   },
 };
 
+type MobileTab = 'signal' | 'chart' | 'stats';
+
 export default function DashboardPage() {
   const [activeAsset, setActiveAsset] = useState<AssetType>('gold');
+  const [mobileTab, setMobileTab] = useState<MobileTab>('chart');
   const { data: rawPrediction, isLoading, isError, refetch, isRefetching } = usePredictions(activeAsset);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const { status } = useSession();
@@ -185,8 +188,30 @@ export default function DashboardPage() {
       {/* ── Zone 3: Main 3-column terminal grid ── */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[300px_1fr_260px] min-h-0 overflow-hidden border-t border-terminal-rule">
 
+        {/* ── Mobile tab bar (visible below lg) ── */}
+        <div className="lg:hidden flex border-b border-terminal-rule bg-terminal-panel shrink-0">
+          {([['signal', 'SIGNAL'], ['chart', 'CHART'], ['stats', 'STATS']] as [MobileTab, string][]).map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => setMobileTab(tab)}
+              className={cn(
+                'flex-1 py-1.5 text-[9px] font-mono font-bold tracking-widest transition-all border-b-2',
+                mobileTab === tab
+                  ? 'text-terminal-hold border-terminal-hold'
+                  : 'text-terminal-label border-transparent hover:text-terminal-value'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* ── Left panel: Signal + SHAP ── */}
-        <div className="border-r border-terminal-rule flex flex-col overflow-y-auto min-h-0">
+        <div className={cn(
+          'border-r border-terminal-rule flex flex-col overflow-y-auto min-h-0',
+          'lg:flex hidden', // always visible on lg
+          mobileTab === 'signal' ? 'flex' : 'hidden' // toggle on mobile
+        )}>
           <TerminalPanelHeader label="SIGNAL ANALYSIS" code="SIG" />
           <div className="flex-1 p-3 space-y-3">
             <TerminalSignalPanel
@@ -198,9 +223,13 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Center panel: Chart ── */}
-        <div className="flex flex-col min-h-0 border-r border-terminal-rule overflow-hidden">
+        <div className={cn(
+          'flex flex-col min-h-0 border-r border-terminal-rule overflow-hidden',
+          'lg:flex hidden',
+          mobileTab === 'chart' ? 'flex' : 'hidden'
+        )}>
           <TerminalPanelHeader
-            label={activeAsset === 'gold' ? 'XAU/USD — GOLD FUTURES' : 'XAG/USD — SILVER FUTURES'}
+            label={activeAsset === 'gold' ? 'XAU/USD — GOLD SPOT' : 'XAG/USD — SILVER SPOT'}
             code="CHT"
             right={
               <span className="text-[9px] font-mono text-terminal-data tracking-widest">
@@ -214,7 +243,11 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right panel: Stats & model info ── */}
-        <div className="flex flex-col min-h-0 overflow-y-auto">
+        <div className={cn(
+          'flex flex-col min-h-0 overflow-y-auto',
+          'lg:flex hidden',
+          mobileTab === 'stats' ? 'flex' : 'hidden'
+        )}>
           <TerminalPanelHeader label="MARKET STATS" code="MKT" />
           <div className="flex-1 p-3">
             <TerminalStatsBar
@@ -223,6 +256,7 @@ export default function DashboardPage() {
               prediction={prediction}
               signalText={signalText}
               confidence={confidence}
+              isLoading={isLoading && !isError && !prediction}
             />
           </div>
         </div>

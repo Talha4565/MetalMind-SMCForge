@@ -19,6 +19,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 class ApiClient {
   private client: AxiosInstance;
   private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  private isRefreshing = false;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -41,17 +44,32 @@ class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response Interceptor: Handle errors globally
+    // Response Interceptor: Handle 401 with silent token refresh
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
         if (error.response) {
-          // Handle 401 — clear auth and redirect to login
+          // Handle 401 — try refresh before redirecting
           if (error.response.status === 401 && !error.config._retry) {
-            this.clearAuth();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/auth/login';
+            if (this.refreshToken) {
+              // Attempt silent token refresh
+              const newToken = await this._silentRefresh();
+              if (newToken) {
+                // Retry original request with new token
+                error.config._retry = true;
+                error.config.headers.Authorization = `Bearer ${newToken}`;
+                return this.client.request(error.config);
+              }
             }
+
+            if (this.accessToken) {
+              // Refresh failed — genuinely expired, redirect to login
+              this.clearAuth();
+              if (typeof window !== 'undefined') {
+                window.location.href = '/auth/login';
+              }
+            }
+            // else: no token set yet — auth sync hasn't fired, just reject
           }
           
           // Format the error for easier consumption
@@ -76,12 +94,48 @@ class ApiClient {
 
   // --- Auth Management (memory-only, never localStorage) ---
 
+  setTokens(accessToken: string, refreshToken?: string) {
+    this.accessToken = accessToken;
+    if (refreshToken) this.refreshToken = refreshToken;
+  }
+
   setAccessToken(token: string) {
     this.accessToken = token;
   }
 
   clearAuth() {
     this.accessToken = null;
+    this.refreshToken = null;
+  }
+
+  /** Silently refresh the access token. Returns new token or null. */
+  private async _silentRefresh(): Promise<string | null> {
+    // Deduplicate concurrent refresh attempts
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+          refresh_token: this.refreshToken,
+        }, { timeout: 8000, withCredentials: true });
+
+        if (response.data?.access_token) {
+          this.accessToken = response.data.access_token;
+          return response.data.access_token;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
   // --- API Endpoints ---
@@ -175,6 +229,7 @@ class ApiClient {
       // Backend may return { summary: {...}, trades: [...] } or flat { win_rate, ... }
       const s = data.summary || data;
       return [{
+        asset: data.asset || s.asset || undefined,
         win_rate: s.win_rate ?? 0,
         profit_factor: s.profit_factor ?? 0,
         max_drawdown: s.max_drawdown ?? s.max_drawdown_pct ?? 0,

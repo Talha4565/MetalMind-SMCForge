@@ -102,9 +102,33 @@ def run_fetch_and_append(asset: str, intervals: list = None):
             result['error'] = error_msg
         
     except ImportError:
-        error_msg = "MetaTrader5 not installed. Run: pip install MetaTrader5"
-        logger.error(error_msg)
-        result['error'] = error_msg
+        logger.warning("MetaTrader5 not installed — falling back to yfinance")
+        try:
+            from etl.extractors.yfinance_extractor import YFinanceExtractor
+            from etl.loaders.csv_append_loader import CSVAppendLoader
+            from config.settings import GOLD_DATASET_DIR, SILVER_DATASET_DIR
+
+            dataset_dir = str(GOLD_DATASET_DIR if asset == 'gold' else SILVER_DATASET_DIR)
+            yf_extractor = YFinanceExtractor(asset=asset, intervals=intervals)
+            data_dict = yf_extractor.extract()  # Returns dict[interval, DataFrame]
+            loader = CSVAppendLoader(output_dir=dataset_dir, asset=asset)
+
+            if data_dict:
+                loader.run(data_dict)
+                for interval, df in data_dict.items():
+                    if df is not None and not df.empty:
+                        result['records_added'] += len(df)
+                        logger.info(f"  ✓ {asset} {interval}: +{len(df)} rows via yfinance")
+
+            if result['records_added'] > 0:
+                result['success'] = True
+                logger.info(f"✓ {asset.upper()} updated via yfinance: +{result['records_added']} rows total")
+            else:
+                result['error'] = "yfinance returned no new data for any interval"
+                logger.warning(result['error'])
+        except Exception as yf_err:
+            result['error'] = f"yfinance fallback also failed: {yf_err}"
+            logger.error(result['error'])
     except subprocess.TimeoutExpired:
         error_msg = "MT5 update timed out after 120 seconds"
         logger.error(error_msg)

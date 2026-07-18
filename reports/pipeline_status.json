@@ -1,0 +1,53 @@
+{
+  "gold_update": {
+    "status": "failed",
+    "started_at": "2026-07-18T06:19:13.042971",
+    "completed_at": "2026-07-18T06:19:24.800251",
+    "result": null,
+    "error": "yfinance returned no new data for any interval"
+  },
+  "gold_retrain": {
+    "status": "success",
+    "started_at": "2026-07-14T13:30:30.855897",
+    "completed_at": "2026-07-14T13:30:47.596794",
+    "result": {
+      "asset": "gold",
+      "started_at": "2026-07-14T13:30:34.137182",
+      "status": "success",
+      "data_rows": 7177,
+      "train_rows": 5023,
+      "val_rows": 1077,
+      "test_rows": 1077,
+      "feature_count": 100,
+      "best_params": {
+        "max_depth": 5,
+        "lr": 0.022867083075677207,
+        "sub": 0.6290097056926162,
+        "col": 0.5069864822321399
+      },
+      "accuracy": 0.8272980501392758,
+      "model_path": "models\\enhanced_15m.pkl",
+      "completed_at": "2026-07-14T13:30:47.593373",
+      "duration_seconds": 13.46
+    },
+    "error": null,
+    "last_success": "2026-07-14T13:30:47.596794"
+  },
+  "silver_update": {
+    "status": "success",
+    "started_at": "2026-07-18T06:19:24.805357",
+    "completed_at": "2026-07-18T06:19:39.904980",
+    "result": {
+      "freshness": {
+        "is_fresh": false,
+        "last_date": "2026-07-17T00:00:00",
+        "age_hours": 30.3,
+        "rows": 56115,
+        "message": "Data is 30.3h old (max: 25h)"
+      },
+      "records_added": 4600
+    },
+    "error": null,
+    "last_success": "2026-07-18T06:19:39.904980"
+  }
+}

@@ -43,19 +43,21 @@ function TerminalClock() {
   );
 }
 
-// Market status chip
+// Market status chip — XAU/USD & XAG/USD trade 24/5
 function MarketStatus() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     const check = () => {
       const now = new Date();
+      const day = now.getUTCDay();
       const h = now.getUTCHours();
       const m = now.getUTCMinutes();
-      const mins = h * 60 + m;
-      const day = now.getUTCDay();
-      // NYSE: 14:30–21:00 UTC Mon–Fri
-      setIsOpen(day >= 1 && day <= 5 && mins >= 870 && mins < 1260);
+      const mins = day * 1440 + h * 60 + m;
+      // Forex metals: Sun 22:00 UTC → Fri 21:00 UTC
+      const marketStart = 0 * 1440 + 22 * 60;   // Sun 22:00 = 1320
+      const marketEnd   = 5 * 1440 + 21 * 60;    // Fri 21:00 = 8460
+      setIsOpen(mins >= marketStart && mins < marketEnd);
     };
     check();
     const id = setInterval(check, 30000);
@@ -112,22 +114,6 @@ export default function Header() {
 
         <MarketStatus />
 
-        <div className="hidden md:flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono text-terminal-label tracking-widest">MODEL</span>
-            <span className="text-[9px] font-mono font-bold text-terminal-data tracking-widest">XGBOOST</span>
-          </div>
-          <span className="text-terminal-rule text-[10px]">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono text-terminal-label tracking-widest">FEATURES</span>
-            <span className="text-[9px] font-mono font-bold text-terminal-value tracking-widest">89</span>
-          </div>
-          <span className="text-terminal-rule text-[10px]">|</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono text-terminal-label tracking-widest">ASSETS</span>
-            <span className="text-[9px] font-mono font-bold text-terminal-hold tracking-widest">XAU · XAG</span>
-          </div>
-        </div>
       </div>
 
       {/* Right — clock + user */}

@@ -37,8 +37,8 @@ if not _refresh_secret:
         raise RuntimeError("REFRESH_SECRET_KEY environment variable must be set in production")
     _refresh_secret = 'dev-refresh-secret-not-for-production'
 REFRESH_SECRET_KEY = _refresh_secret
-ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
-REFRESH_TOKEN_EXPIRY = timedelta(days=7)
+ACCESS_TOKEN_EXPIRY = timedelta(hours=24)
+REFRESH_TOKEN_EXPIRY = timedelta(days=30)
 OTP_EXPIRY = timedelta(minutes=10)
 
 # ==================== HELPER FUNCTIONS ====================

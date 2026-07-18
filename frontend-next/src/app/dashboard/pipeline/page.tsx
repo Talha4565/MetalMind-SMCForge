@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/Common/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Activity, Database, Cpu, RefreshCcw, Play, CheckCircle2, AlertCircle, Clock, Zap, GitBranch, TrendingUp } from 'lucide-react';
+import TerminalCard, { TerminalButton } from '@/components/Common/TerminalCard';
+import { Activity, Database, Cpu, RefreshCcw, Play, Clock, GitBranch, TrendingUp } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
@@ -25,17 +24,8 @@ interface PipelineDetails {
   health: { status: string; uptime: string; last_incident: string | null };
 }
 
-const PIPELINE_ICONS: Record<string, typeof Activity> = {
-  etl: Database,
-  features: GitBranch,
-  training: Cpu,
-};
-
-const PIPELINE_COLORS: Record<string, string> = {
-  etl: 'text-blue-400',
-  features: 'text-purple-400',
-  training: 'text-amber-400',
-};
+const PIPELINE_ICONS: Record<string, typeof Activity> = { etl: Database, features: GitBranch, training: Cpu };
+const PIPELINE_COLORS: Record<string, string> = { etl: 'text-terminal-data', features: 'text-terminal-hold', training: 'text-terminal-buy' };
 
 export default function PipelinePage() {
   const [details, setDetails] = useState<PipelineDetails | null>(null);
@@ -43,129 +33,73 @@ export default function PipelinePage() {
   const [running, setRunning] = useState<string | null>(null);
 
   const fetchDetails = async () => {
-    try {
-      const data = await apiClient.getPipelineDetails();
-      setDetails(data);
-    } catch {
-      setDetails(null);
-    } finally {
-      setLoading(false);
-    }
+    try { setDetails(await apiClient.getPipelineDetails()); } catch { setDetails(null); } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchDetails();
-    const interval = setInterval(fetchDetails, 60000); // Poll every 60s to avoid rate limits
-    return () => clearInterval(interval);
-  }, []);
+  useEffect(() => { fetchDetails(); const interval = setInterval(fetchDetails, 60000); return () => clearInterval(interval); }, []);
 
   const handleTrigger = async (type: string, asset: string) => {
     const key = `${type}-${asset}`;
     setRunning(key);
-    try {
-      await apiClient.triggerPipeline(type, asset);
-      await fetchDetails();
-    } catch {
-      // ignore
-    } finally {
-      setRunning(null);
-    }
+    try { await apiClient.triggerPipeline(type, asset); await fetchDetails(); } catch { /* ignore */ } finally { setRunning(null); }
   };
 
   if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-96">
-          <RefreshCcw className="w-8 h-8 animate-spin text-blue-500" />
-        </div>
-      </DashboardLayout>
-    );
+    return <DashboardLayout><div className="flex items-center justify-center min-h-96"><RefreshCcw className="w-8 h-8 animate-spin text-terminal-label" /></div></DashboardLayout>;
   }
 
   if (!details) {
-    return (
-      <DashboardLayout>
-        <div className="text-center py-12 text-muted-foreground">Failed to load pipeline details</div>
-      </DashboardLayout>
-    );
+    return <DashboardLayout><div className="text-center py-12 font-mono text-terminal-label">Failed to load pipeline details</div></DashboardLayout>;
   }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-6 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-card-foreground">Pipeline</h1>
-            <p className="text-muted-foreground mt-1">Data flow, feature engineering, and model training pipelines.</p>
+            <h1 className="text-2xl font-black tracking-tight text-terminal-value font-mono">PIPELINE</h1>
+            <p className="text-terminal-label text-xs mt-1 font-mono tracking-wider">Data flow · feature engineering · model training</p>
           </div>
-          <Button variant="outline" size="sm" className="border-border w-fit" onClick={fetchDetails}>
-            <RefreshCcw className="w-4 h-4 mr-2" /> Refresh
-          </Button>
+          <TerminalButton variant="secondary" size="sm" onClick={fetchDetails}>
+            <RefreshCcw className="w-3 h-3" /> REFRESH
+          </TerminalButton>
         </div>
 
-        {/* System Health Banner */}
-        <Card className={cn(
-          "border",
-          details.health?.status === 'healthy' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-amber-500/5 border-amber-500/20"
-        )}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "w-3 h-3 rounded-full animate-pulse",
-                details.health?.status === 'healthy' ? "bg-emerald-500" : "bg-amber-500"
-              )} />
-              <div>
-                <p className="text-sm font-bold text-card-foreground">
-                  System {details.health?.status === 'healthy' ? 'Healthy' : 'Degraded'}
-                </p>
-                <p className="text-[10px] text-muted-foreground">
-                  Uptime: {details.health?.uptime || 'N/A'}
-                </p>
-              </div>
+        {/* System Health */}
+        <div className={cn("border px-4 py-3", details.health?.status === 'healthy' ? "border-terminal-buy/20 bg-terminal-buy/5" : "border-terminal-hold/20 bg-terminal-hold/5")}>
+          <div className="flex items-center gap-3">
+            <div className={cn("w-3 h-3 rounded-full animate-pulse", details.health?.status === 'healthy' ? "bg-terminal-buy" : "bg-terminal-hold")} />
+            <div>
+              <p className="text-sm font-mono font-bold text-terminal-value">System {details.health?.status === 'healthy' ? 'Healthy' : 'Degraded'}</p>
+              <p className="text-[9px] font-mono text-terminal-label">Uptime: {details.health?.uptime || 'N/A'}</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* 3 Pipeline Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {details.pipelines && Object.entries(details.pipelines).map(([key, pipeline]) => {
             const Icon = PIPELINE_ICONS[key] || Activity;
-            const color = PIPELINE_COLORS[key] || 'text-muted-foreground';
+            const color = PIPELINE_COLORS[key] || 'text-terminal-label';
             return (
-              <Card key={key} className="bg-card border-border">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                      <Icon className={cn("w-4 h-4", color)} />
-                      {pipeline.name}
-                    </CardTitle>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                      pipeline.status === 'active' ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
-                    )}>
-                      {pipeline.status}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground">{pipeline.description}</p>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    <span>{pipeline.schedule}</span>
+              <TerminalCard key={key} title={pipeline.name} code={key.slice(0, 3).toUpperCase()}>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-mono text-terminal-label">{pipeline.description}</p>
+                  <div className="flex items-center gap-1.5 text-[9px] font-mono text-terminal-label">
+                    <Clock className="w-3 h-3" />{pipeline.schedule}
                   </div>
                   {'last_run' in pipeline && pipeline.last_run && (
-                    <div className="text-[10px] text-muted-foreground">
-                      Last: {new Date(pipeline.last_run).toLocaleString()}
-                    </div>
+                    <div className="text-[9px] font-mono text-terminal-label">Last: {new Date(pipeline.last_run).toLocaleString()}</div>
                   )}
                   {'features_count' in pipeline && (
-                    <div className="text-[10px] text-muted-foreground">
-                      Features: {pipeline.features_count}
-                    </div>
+                    <div className="text-[9px] font-mono text-terminal-label">Features: {pipeline.features_count}</div>
                   )}
-                </CardContent>
-              </Card>
+                  <span className={cn('inline-block px-2 py-0.5 text-[9px] font-mono font-bold border',
+                    pipeline.status === 'active' ? 'border-terminal-buy/20 text-terminal-buy' : 'border-terminal-hold/20 text-terminal-hold')}>
+                    {pipeline.status}
+                  </span>
+                </div>
+              </TerminalCard>
             );
           })}
         </div>
@@ -177,76 +111,39 @@ export default function PipelinePage() {
             const model = details?.models?.[asset as keyof typeof details.models];
             if (!data) return null;
             return (
-              <Card key={asset} className="bg-card border-border">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-bold uppercase flex items-center gap-2">
-                      {asset === 'gold' ? <TrendingUp className="w-4 h-4 text-amber-400" /> : <TrendingUp className="w-4 h-4 text-slate-400" />}
-                      {asset}
-                    </CardTitle>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-bold",
-                      data.is_fresh ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                    )}>
-                      {data.is_fresh ? 'Fresh' : 'Stale'}
-                    </span>
+              <TerminalCard key={asset} title={asset.toUpperCase()} code={asset === 'gold' ? 'XAU' : 'XAG'}
+                right={<span className={cn('text-[9px] font-mono font-bold', data.is_fresh ? 'text-terminal-buy' : 'text-terminal-sell')}>{data.is_fresh ? 'FRESH' : 'STALE'}</span>}>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="p-2 border border-terminal-rule bg-terminal-panel">
+                    <p className="text-[8px] font-mono text-terminal-label">Data Age</p>
+                    <p className="text-lg font-mono font-bold text-terminal-value">{data.age_hours}h</p>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground">Data Age</p>
-                      <p className="text-lg font-mono font-bold text-card-foreground">{data.age_hours}h</p>
+                  <div className="p-2 border border-terminal-rule bg-terminal-panel">
+                    <p className="text-[8px] font-mono text-terminal-label">Rows</p>
+                    <p className="text-lg font-mono font-bold text-terminal-value">{data.rows != null ? data.rows.toLocaleString() : '—'}</p>
+                  </div>
+                </div>
+                {model && (
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="p-2 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono text-terminal-label">Model</p>
+                      <p className="text-[10px] font-mono text-terminal-value">{model.exists ? `${model.size_mb} MB` : 'Missing'}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground">Rows</p>
-                      <p className="text-lg font-mono font-bold text-card-foreground">{data.rows.toLocaleString()}</p>
+                    <div className="p-2 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono text-terminal-label">Features</p>
+                      <p className="text-[10px] font-mono text-terminal-value">{model.features}</p>
                     </div>
                   </div>
-                  {model && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Model</p>
-                        <p className="text-xs font-mono text-card-foreground">{model.exists ? `${model.size_mb} MB` : 'Missing'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Features</p>
-                        <p className="text-xs font-mono text-card-foreground">{model.features}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 border-border"
-                      onClick={() => handleTrigger('update', asset)}
-                      disabled={running === `update-${asset}`}
-                    >
-                      {running === `update-${asset}` ? (
-                        <RefreshCcw className="w-3 h-3 mr-1 animate-spin" />
-                      ) : (
-                        <Play className="w-3 h-3 mr-1" />
-                      )}
-                      Update Data
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 border-border"
-                      onClick={() => handleTrigger('retrain', asset)}
-                      disabled={running === `retrain-${asset}`}
-                    >
-                      {running === `retrain-${asset}` ? (
-                        <RefreshCcw className="w-3 h-3 mr-1 animate-spin" />
-                      ) : (
-                        <Cpu className="w-3 h-3 mr-1" />
-                      )}
-                      Retrain
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                )}
+                <div className="flex gap-2">
+                  <TerminalButton variant="secondary" size="sm" onClick={() => handleTrigger('update', asset)} disabled={running === `update-${asset}`} isLoading={running === `update-${asset}`}>
+                    <Play className="w-3 h-3" /> UPDATE
+                  </TerminalButton>
+                  <TerminalButton variant="primary" size="sm" onClick={() => handleTrigger('retrain', asset)} disabled={running === `retrain-${asset}`} isLoading={running === `retrain-${asset}`}>
+                    <Cpu className="w-3 h-3" /> RETRAIN
+                  </TerminalButton>
+                </div>
+              </TerminalCard>
             );
           })}
         </div>

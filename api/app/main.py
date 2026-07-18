@@ -573,6 +573,8 @@ from etl.agents.llm_client import NemotronClient
 from etl.agents.signal_reasoner import SignalReasoner
 
 prediction_logger = PredictionLogger()
+from etl.prediction_logger import ActiveTradeTracker
+active_trades = ActiveTradeTracker()
 email_alerts = EmailAlertService(confidence_threshold=0.70)
 # Deterministic gate — runs unconditionally on every candidate alert.
 alert_risk_gate = AlertRiskGate()
@@ -861,14 +863,28 @@ def get_latest_predictions():
         # Prepare response
         tp_pct = 0.0045 if asset == 'gold' else 0.003
         sl_pct = 0.0015 if asset == 'gold' else 0.001
+
+        # ── Active trade: freeze TP/SL instead of recalculating ──
+        active = active_trades.get_active(asset)
+        frozen_tp = active['tp_price'] if active else None
+        frozen_sl = active['sl_price'] if active else None
+        frozen_signal = active['signal'] if active else None
+
         results = []
         for i, (idx, row) in enumerate(recent_data.iterrows()):
-            # Use real SHAP for latest bar, placeholder for others
             bar_shap = shap_values_for_response[-1] if i == len(recent_data) - 1 else shap_values_for_response[0]
-
             entry_price = float(row['close'])
-            tp_price = round(entry_price * (1 + tp_pct), 2)
-            sl_price = round(entry_price * (1 - sl_pct), 2)
+            signal_val = int(predictions[i])
+            prob_val = float(probabilities[i])
+
+            # If there's an active trade, lock the signal and TP/SL
+            if active and i == len(recent_data) - 1:  # Only override the latest bar
+                signal_val = frozen_signal
+                tp_price = frozen_tp
+                sl_price = frozen_sl
+            else:
+                tp_price = round(entry_price * (1 + tp_pct), 2)
+                sl_price = round(entry_price * (1 - sl_pct), 2)
 
             results.append({
                 'timestamp': idx.isoformat(),
@@ -877,34 +893,63 @@ def get_latest_predictions():
                 'high': float(row['high']),
                 'low': float(row['low']),
                 'close': float(row['close']),
-                'price': float(row['close']), # FIXED: Expected by frontend (prediction.price)
-                'signal': int(predictions[i]),
-                'probability': float(probabilities[i]),
-                'confidence': float(probabilities[i]), # FIXED: Expected by frontend (prediction.confidence)
+                'price': float(row['close']),
+                'signal': signal_val,
+                'probability': prob_val,
+                'confidence': prob_val,
                 'tp_price': tp_price,
                 'sl_price': sl_price,
-                'shap_values': bar_shap
+                'shap_values': bar_shap,
+                'trade_active': active is not None,  # Frontend can show "TRADE ACTIVE"
             })
-        
-        # Log the latest prediction and check for alerts
+
+        # Log prediction and manage active trades
         if results:
             latest = results[-1]
-            # Compute TP/SL levels from config
-            tp_pct = 0.0045 if asset == 'gold' else 0.003
-            sl_pct = 0.0015 if asset == 'gold' else 0.001
             entry_price = latest['price']
-            tp_price = round(entry_price * (1 + tp_pct), 2)
-            sl_price = round(entry_price * (1 - sl_pct), 2)
+            is_buy_sell = latest['signal'] in (1, -1)
+            high_confidence = latest['confidence'] > 0.65
 
-            prediction_logger.log_prediction(
-                asset=asset,
-                signal=latest['signal'],
-                confidence=latest['confidence'],
-                price=latest['price'],
-                shap_values=latest.get('shap_values', []),
-                tp_price=tp_price,
-                sl_price=sl_price,
-            )
+            if is_buy_sell and high_confidence:
+                if not active_trades.has_active(asset):
+                    # Open new trade with FROZEN TP/SL
+                    tp_price = round(entry_price * (1 + tp_pct), 2)
+                    sl_price = round(entry_price * (1 - sl_pct), 2)
+                    active_trades.open_trade(
+                        asset=asset,
+                        signal=int(latest['signal']),
+                        confidence=latest['confidence'],
+                        entry_price=entry_price,
+                        tp_price=tp_price,
+                        sl_price=sl_price,
+                        shap_values=latest.get('shap_values', []),
+                    )
+                    # Override latest result with frozen values
+                    latest['tp_price'] = tp_price
+                    latest['sl_price'] = sl_price
+                    latest['trade_active'] = True
+
+                    prediction_logger.log_prediction(
+                        asset=asset,
+                        signal=latest['signal'],
+                        confidence=latest['confidence'],
+                        price=latest['price'],
+                        shap_values=latest.get('shap_values', []),
+                        tp_price=tp_price,
+                        sl_price=sl_price,
+                    )
+            elif not is_buy_sell:
+                # HOLD signal — only log if no active trade
+                if not active_trades.has_active(asset):
+                    prediction_logger.log_prediction(
+                        asset=asset,
+                        signal=latest['signal'],
+                        confidence=latest['confidence'],
+                        price=latest['price'],
+                        shap_values=latest.get('shap_values', []),
+                        tp_price=round(entry_price * (1 + tp_pct), 2),
+                        sl_price=round(entry_price * (1 - sl_pct), 2),
+                    )
             
             # Store signal in ChromaDB for similarity search
             try:
@@ -993,9 +1038,28 @@ def get_latest_predictions():
                         cache = json.load(f)
                     if a in cache.get('prices', {}):
                         live_prices[a] = cache['prices'][a]['price']
+
+            # ── Check active trades first ──
+            for a in ['gold', 'silver']:
+                if a in live_prices and active_trades.has_active(a):
+                    resolved = active_trades.check_outcome(a, live_prices[a])
+                    if resolved:
+                        # Trade resolved — log outcome and update tracker
+                        outcome_tracker.log_outcome(
+                            signal_id=f"{resolved['opened_at']}_{a}",
+                            asset=a,
+                            signal=resolved['signal'],
+                            confidence=resolved['confidence'],
+                            price=resolved['close_price'],
+                            entry_price=resolved['entry_price'],
+                            outcome=resolved['outcome'],
+                            pnl=resolved['actual_pnl'],
+                        )
+
+            # Also run legacy outcome check for non-trade-tracked predictions
             if live_prices:
                 prediction_logger.check_outcomes(live_prices)
-                
+
                 # Update outcome tracker for self-learning
                 try:
                     for log_file in sorted(Path('/app/reports/predictions').glob('predictions_*.jsonl'))[-3:]:

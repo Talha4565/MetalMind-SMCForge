@@ -2,86 +2,43 @@
 
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/Common/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import TerminalCard, { TerminalStatRow, TerminalSectionHeader } from '@/components/Common/TerminalCard';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api-client';
 import { AssetType } from '@/lib/api-types';
-import {
-  Calculator,
-  TrendingUp,
-  TrendingDown,
-  Shield,
-  AlertTriangle,
-  DollarSign,
-  BarChart3,
-  RefreshCcw,
-} from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown, Shield, AlertTriangle, DollarSign, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Trading parameters from config
 const TRADING_PARAMS = {
   gold: { tp_pct: 0.0045, sl_pct: 0.0015, lot_size: 100, pip_value: 0.01 },
   silver: { tp_pct: 0.003, sl_pct: 0.001, lot_size: 5000, pip_value: 0.001 },
 };
 
 const RISK_PROFILES = {
-  conservative: { risk_pct: 0.01, label: 'Conservative', desc: '1% risk per trade' },
-  balanced: { risk_pct: 0.02, label: 'Balanced', desc: '2% risk per trade' },
-  aggressive: { risk_pct: 0.03, label: 'Aggressive', desc: '3% risk per trade' },
+  conservative: { risk_pct: 0.01, label: 'Conservative', desc: '1% risk/trade' },
+  balanced: { risk_pct: 0.02, label: 'Balanced', desc: '2% risk/trade' },
+  aggressive: { risk_pct: 0.03, label: 'Aggressive', desc: '3% risk/trade' },
 };
 
 interface RiskCalculation {
-  riskDollars: number;
-  riskPercent: number;
-  positionSize: number;
-  lotSize: number;
-  stopLossPrice: number;
-  takeProfitPrice: number;
-  riskReward: number;
-  marginRequired: number;
+  riskDollars: number; riskPercent: number; positionSize: number;
+  lotSize: number; stopLossPrice: number; takeProfitPrice: number;
+  riskReward: number; marginRequired: number;
 }
 
-function calculateRisk(
-  balance: number,
-  price: number,
-  asset: AssetType,
-  riskProfile: keyof typeof RISK_PROFILES
-): RiskCalculation | null {
+function calculateRisk(balance: number, price: number, asset: AssetType, riskProfile: keyof typeof RISK_PROFILES): RiskCalculation | null {
   if (balance <= 0 || price <= 0) return null;
-
   const params = TRADING_PARAMS[asset];
   const profile = RISK_PROFILES[riskProfile];
-
   const riskDollars = balance * profile.risk_pct;
   const riskPercent = profile.risk_pct * 100;
-
-  // Position size = risk $ / (entry price × stop loss %)
   const positionSize = riskDollars / (price * params.sl_pct);
-
-  // Lot size (gold: 1 lot = 100 oz, silver: 1 lot = 5000 oz)
   const lotSize = positionSize / params.lot_size;
-
-  // Stop loss and take profit prices
   const stopLossPrice = price * (1 - params.sl_pct);
   const takeProfitPrice = price * (1 + params.tp_pct);
-
-  // Risk/reward ratio
   const riskReward = params.tp_pct / params.sl_pct;
-
-  // Margin required (assuming 5% margin for demonstration)
   const marginRequired = (positionSize * price) * 0.05;
-
-  return {
-    riskDollars,
-    riskPercent,
-    positionSize,
-    lotSize,
-    stopLossPrice,
-    takeProfitPrice,
-    riskReward,
-    marginRequired,
-  };
+  return { riskDollars, riskPercent, positionSize, lotSize, stopLossPrice, takeProfitPrice, riskReward, marginRequired };
 }
 
 export default function RiskPage() {
@@ -96,13 +53,8 @@ export default function RiskPage() {
     const fetchPrice = async () => {
       try {
         const data = await apiClient.getLivePrice(activeAsset);
-        if (mounted) {
-          setLivePrice(data.price);
-          setIsLoading(false);
-        }
-      } catch {
-        if (mounted) setIsLoading(false);
-      }
+        if (mounted) { setLivePrice(data.price); setIsLoading(false); }
+      } catch { if (mounted) setIsLoading(false); }
     };
     fetchPrice();
     const interval = setInterval(fetchPrice, 15000);
@@ -113,268 +65,148 @@ export default function RiskPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="rounded-xl border border-border bg-card p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Risk calculator</p>
-              <h1 className="mt-1 text-3xl font-black text-card-foreground">Position sizing</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Calculate trade size, stop loss, take profit, and risk/reward ratio.
-              </p>
-            </div>
-
-            {/* Asset toggle */}
-            <div className="flex bg-background p-1 rounded-lg border border-border">
-              {(['gold', 'silver'] as AssetType[]).map((asset) => (
-                <button
-                  key={asset}
-                  onClick={() => setActiveAsset(asset)}
-                  className={cn(
-                    "px-5 py-2 rounded-md text-xs font-bold uppercase tracking-widest transition-all",
-                    activeAsset === asset
-                      ? "bg-card text-card-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {asset}
-                </button>
-              ))}
-            </div>
+      <div className="space-y-6 p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-terminal-value font-mono">RISK CALCULATOR</h1>
+            <p className="text-terminal-label text-xs mt-1 font-mono tracking-wider">Position sizing · stop loss · take profit</p>
+          </div>
+          <div className="flex border border-terminal-rule">
+            {(['gold', 'silver'] as AssetType[]).map((a) => (
+              <button key={a} onClick={() => setActiveAsset(a)}
+                className={cn('px-4 py-1.5 text-[9px] font-mono font-bold uppercase tracking-widest transition-all border-r border-terminal-rule last:border-0',
+                  activeAsset === a ? 'bg-terminal-hold text-black' : 'text-terminal-label hover:text-terminal-value')}>
+                {a === 'gold' ? 'XAU/USD' : 'XAG/USD'}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-          {/* Left: Inputs + Results */}
-          <div className="space-y-6">
-            {/* Account Balance */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-sm font-bold text-card-foreground flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-500" />
-                  Account balance
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground text-lg">$</span>
-                  <Input
-                    type="number"
-                    value={balance}
-                    onChange={(e) => setBalance(Number(e.target.value) || 0)}
-                    className="text-2xl font-mono font-black h-14 bg-background border-border text-card-foreground"
-                    min={0}
-                    step={100}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+          {/* Left column */}
+          <div className="space-y-4">
+            {/* Balance */}
+            <TerminalCard title="ACCOUNT BALANCE" code="BAL">
+              <div className="flex items-center gap-3">
+                <span className="text-terminal-label font-mono text-lg">$</span>
+                <Input type="number" value={balance} onChange={(e) => setBalance(Number(e.target.value) || 0)}
+                  className="text-2xl font-mono font-black h-14 bg-terminal-panel border-terminal-rule text-terminal-value rounded-none" min={0} step={100} />
+              </div>
+            </TerminalCard>
 
             {/* Risk Profile */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-sm font-bold text-card-foreground flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-500" />
-                  Risk profile
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3">
-                  {(Object.entries(RISK_PROFILES) as [keyof typeof RISK_PROFILES, typeof RISK_PROFILES[keyof typeof RISK_PROFILES]][]).map(([key, profile]) => (
-                    <button
-                      key={key}
-                      onClick={() => setRiskProfile(key)}
-                      className={cn(
-                        "p-4 rounded-xl border text-left transition-all",
-                        riskProfile === key
-                          ? "border-emerald-500 bg-emerald-500/10 text-card-foreground"
-                          : "border-border bg-background text-muted-foreground hover:border-slate-600"
-                      )}
-                    >
-                      <p className="font-bold text-sm">{profile.label}</p>
-                      <p className="text-xs mt-1 opacity-70">{profile.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <TerminalCard title="RISK PROFILE" code="RSK">
+              <div className="grid grid-cols-3 gap-3">
+                {(Object.entries(RISK_PROFILES) as [keyof typeof RISK_PROFILES, typeof RISK_PROFILES[keyof typeof RISK_PROFILES]][]).map(([key, profile]) => (
+                  <button key={key} onClick={() => setRiskProfile(key)}
+                    className={cn('p-3 border text-left transition-all font-mono',
+                      riskProfile === key ? 'border-terminal-hold bg-terminal-hold/10 text-terminal-value' : 'border-terminal-rule bg-terminal-panel text-terminal-label hover:border-terminal-label')}>
+                    <p className="font-bold text-[10px]">{profile.label}</p>
+                    <p className="text-[8px] mt-1 opacity-70">{profile.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </TerminalCard>
 
             {/* Current Price */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-sm font-bold text-card-foreground flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-emerald-500" />
-                  Current price
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="h-12 bg-background rounded-lg animate-pulse" />
-                ) : (
-                  <p className="text-3xl font-black font-mono text-card-foreground">
-                    ${livePrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '—'}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {activeAsset === 'gold' ? 'XAU/USD' : 'XAG/USD'} • Live from Yahoo Finance
+            <TerminalCard title="CURRENT PRICE" code="PRC">
+              {isLoading ? (
+                <div className="h-12 bg-terminal-panel border border-terminal-rule animate-pulse" />
+              ) : (
+                <p className="text-3xl font-black font-mono text-terminal-value">
+                  ${livePrice?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '—'}
                 </p>
-              </CardContent>
-            </Card>
+              )}
+              <p className="text-[9px] font-mono text-terminal-label mt-1">{activeAsset === 'gold' ? 'XAU/USD' : 'XAG/USD'} · Live MT5</p>
+            </TerminalCard>
 
             {/* Risk Parameters */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-sm font-bold text-card-foreground flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Risk parameters
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="p-3 rounded-lg bg-background">
-                    <p className="text-muted-foreground text-xs">Take profit</p>
-                    <p className="font-bold text-card-foreground">{(TRADING_PARAMS[activeAsset].tp_pct * 100).toFixed(2)}%</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background">
-                    <p className="text-muted-foreground text-xs">Stop loss</p>
-                    <p className="font-bold text-card-foreground">{(TRADING_PARAMS[activeAsset].sl_pct * 100).toFixed(2)}%</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background">
-                    <p className="text-muted-foreground text-xs">Lot size</p>
-                    <p className="font-bold text-card-foreground">{TRADING_PARAMS[activeAsset].lot_size} {activeAsset === 'gold' ? 'oz' : 'oz'}</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-background">
-                    <p className="text-muted-foreground text-xs">Margin (5%)</p>
-                    <p className="font-bold text-card-foreground">${calc ? calc.marginRequired.toFixed(2) : '—'}</p>
-                  </div>
+            <TerminalCard title="RISK PARAMETERS" code="PAR">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                  <p className="text-[9px] font-mono text-terminal-label">Take Profit</p>
+                  <p className="font-mono font-bold text-terminal-buy text-sm">{(TRADING_PARAMS[activeAsset].tp_pct * 100).toFixed(2)}%</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                  <p className="text-[9px] font-mono text-terminal-label">Stop Loss</p>
+                  <p className="font-mono font-bold text-terminal-sell text-sm">{(TRADING_PARAMS[activeAsset].sl_pct * 100).toFixed(2)}%</p>
+                </div>
+                <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                  <p className="text-[9px] font-mono text-terminal-label">Lot Size</p>
+                  <p className="font-mono font-bold text-terminal-value text-sm">{TRADING_PARAMS[activeAsset].lot_size} oz</p>
+                </div>
+                <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                  <p className="text-[9px] font-mono text-terminal-label">Margin (5%)</p>
+                  <p className="font-mono font-bold text-terminal-value text-sm">${calc ? calc.marginRequired.toFixed(2) : '—'}</p>
+                </div>
+              </div>
+            </TerminalCard>
           </div>
 
           {/* Right: Results */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {calc ? (
               <>
-                {/* Risk Summary */}
-                <Card className="bg-card border-border border-l-4 border-l-emerald-500">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold text-card-foreground flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-emerald-500" />
-                      Trade calculation
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl bg-background">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Risk per trade</p>
-                        <p className="text-2xl font-black font-mono text-card-foreground mt-1">
-                          ${calc.riskDollars.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{calc.riskPercent.toFixed(1)}% of balance</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-background">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Position size</p>
-                        <p className="text-2xl font-black font-mono text-card-foreground mt-1">
-                          {calc.positionSize.toFixed(4)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{activeAsset === 'gold' ? 'troy oz' : 'troy oz'}</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-background">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Lot size</p>
-                        <p className="text-2xl font-black font-mono text-card-foreground mt-1">
-                          {calc.lotSize.toFixed(4)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">standard lots</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-background">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Risk / Reward</p>
-                        <p className={cn("text-2xl font-black font-mono mt-1", calc.riskReward >= 2 ? "text-emerald-400" : calc.riskReward >= 1.5 ? "text-amber-400" : "text-red-400")}>
-                          1 : {calc.riskReward.toFixed(1)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {calc.riskReward >= 2 ? 'Excellent' : calc.riskReward >= 1.5 ? 'Acceptable' : 'Poor'}
-                        </p>
-                      </div>
+                <TerminalCard title="TRADE CALCULATION" code="CAL">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono font-bold uppercase tracking-widest text-terminal-label">Risk/Trade</p>
+                      <p className="text-xl font-black font-mono text-terminal-value mt-1">${calc.riskDollars.toFixed(2)}</p>
+                      <p className="text-[8px] font-mono text-terminal-label">{calc.riskPercent.toFixed(1)}% of balance</p>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono font-bold uppercase tracking-widest text-terminal-label">Position</p>
+                      <p className="text-xl font-black font-mono text-terminal-value mt-1">{calc.positionSize.toFixed(4)}</p>
+                      <p className="text-[8px] font-mono text-terminal-label">troy oz</p>
+                    </div>
+                    <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono font-bold uppercase tracking-widest text-terminal-label">Lot Size</p>
+                      <p className="text-xl font-black font-mono text-terminal-value mt-1">{calc.lotSize.toFixed(4)}</p>
+                      <p className="text-[8px] font-mono text-terminal-label">standard lots</p>
+                    </div>
+                    <div className="p-3 border border-terminal-rule bg-terminal-panel">
+                      <p className="text-[8px] font-mono font-bold uppercase tracking-widest text-terminal-label">R/R</p>
+                      <p className={cn('text-xl font-black font-mono mt-1', calc.riskReward >= 2 ? 'text-terminal-buy' : calc.riskReward >= 1.5 ? 'text-terminal-hold' : 'text-terminal-sell')}>
+                        1:{calc.riskReward.toFixed(1)}
+                      </p>
+                      <p className="text-[8px] font-mono text-terminal-label">{calc.riskReward >= 2 ? 'Excellent' : calc.riskReward >= 1.5 ? 'Acceptable' : 'Poor'}</p>
+                    </div>
+                  </div>
+                </TerminalCard>
 
-                {/* Entry / SL / TP */}
-                <Card className="bg-card border-border">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-sm font-bold text-card-foreground">Price levels</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-4 h-4 text-emerald-500" />
-                          <span className="text-sm font-bold text-card-foreground">Take profit</span>
-                        </div>
-                        <span className="font-mono font-bold text-emerald-400">
-                          ${calc.takeProfitPrice.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-bold text-card-foreground">Entry price</span>
-                        </div>
-                        <span className="font-mono font-bold text-card-foreground">
-                          ${livePrice?.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                        <div className="flex items-center gap-2">
-                          <TrendingDown className="w-4 h-4 text-red-500" />
-                          <span className="text-sm font-bold text-card-foreground">Stop loss</span>
-                        </div>
-                        <span className="font-mono font-bold text-red-400">
-                          ${calc.stopLossPrice.toFixed(2)}
-                        </span>
-                      </div>
+                <TerminalCard title="PRICE LEVELS" code="LVL">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 border border-terminal-buy/20 bg-terminal-buy/5">
+                      <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-terminal-buy" /><span className="text-xs font-mono font-bold text-terminal-value">Take Profit</span></div>
+                      <span className="font-mono font-bold text-terminal-buy">${calc.takeProfitPrice.toFixed(2)}</span>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="flex items-center justify-between p-3 border border-terminal-rule bg-terminal-panel">
+                      <div className="flex items-center gap-2"><DollarSign className="w-4 h-4 text-terminal-label" /><span className="text-xs font-mono font-bold text-terminal-value">Entry</span></div>
+                      <span className="font-mono font-bold text-terminal-value">${livePrice?.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 border border-terminal-sell/20 bg-terminal-sell/5">
+                      <div className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-terminal-sell" /><span className="text-xs font-mono font-bold text-terminal-value">Stop Loss</span></div>
+                      <span className="font-mono font-bold text-terminal-sell">${calc.stopLossPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </TerminalCard>
 
-                {/* Quick Summary */}
-                <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Shield className="w-5 h-5 text-emerald-500" />
-                      <span className="text-sm font-bold text-card-foreground">Trade summary</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">You risk</p>
-                        <p className="font-bold text-card-foreground">${calc.riskDollars.toFixed(2)} ({calc.riskPercent.toFixed(1)}%)</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Position</p>
-                        <p className="font-bold text-card-foreground">{calc.positionSize.toFixed(4)} oz</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">If TP hits</p>
-                        <p className="font-bold text-emerald-400">+${(calc.riskDollars * calc.riskReward).toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">If SL hits</p>
-                        <p className="font-bold text-red-400">-${calc.riskDollars.toFixed(2)}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="border border-terminal-hold/20 bg-terminal-hold/5 p-4">
+                  <div className="flex items-center gap-2 mb-3"><Shield className="w-4 h-4 text-terminal-hold" /><span className="text-xs font-mono font-bold text-terminal-value">TRADE SUMMARY</span></div>
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div><p className="text-terminal-label">You risk</p><p className="font-bold text-terminal-value">${calc.riskDollars.toFixed(2)} ({calc.riskPercent.toFixed(1)}%)</p></div>
+                    <div><p className="text-terminal-label">Position</p><p className="font-bold text-terminal-value">{calc.positionSize.toFixed(4)} oz</p></div>
+                    <div><p className="text-terminal-label">If TP hits</p><p className="font-bold text-terminal-buy">+${(calc.riskDollars * calc.riskReward).toFixed(2)}</p></div>
+                    <div><p className="text-terminal-label">If SL hits</p><p className="font-bold text-terminal-sell">-${calc.riskDollars.toFixed(2)}</p></div>
+                  </div>
+                </div>
               </>
             ) : (
-              <Card className="bg-card border-border">
-                <CardContent className="pt-6">
-                  <p className="text-muted-foreground text-center">
-                    {isLoading ? 'Loading price data...' : 'Enter a valid balance to calculate position size.'}
-                  </p>
-                </CardContent>
-              </Card>
+              <TerminalCard title="TRADE CALCULATION" code="CAL">
+                <p className="font-mono text-xs text-terminal-label text-center py-8">
+                  {isLoading ? 'Loading price data...' : 'Enter a valid balance to calculate position size.'}
+                </p>
+              </TerminalCard>
             )}
           </div>
         </div>

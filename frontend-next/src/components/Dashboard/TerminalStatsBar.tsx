@@ -2,6 +2,7 @@
 
 import { PredictionItem, AssetType } from '@/lib/api-types';
 import { cn } from '@/lib/utils';
+import { TerminalStatRow, TerminalSectionHeader } from '@/components/Common/TerminalCard';
 
 interface Props {
   activeAsset: AssetType;
@@ -9,26 +10,28 @@ interface Props {
   prediction?: PredictionItem;
   signalText: string;
   confidence: string | null;
+  isLoading?: boolean;
 }
 
-function StatRow({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function SkeletonStatRow() {
   return (
     <div className="flex items-center justify-between py-2 border-b border-terminal-rule last:border-0">
-      <span className="text-[9px] font-mono text-terminal-label tracking-widest">{label}</span>
-      <span className={cn('text-[10px] font-mono font-bold tabular-nums text-terminal-value', valueClass)}>
-        {value}
-      </span>
+      <div className="h-3 w-16 bg-terminal-rule animate-pulse" />
+      <div className="h-3 w-20 bg-terminal-rule animate-pulse" />
     </div>
   );
 }
 
-function SectionHeader({ label }: { label: string }) {
+function SkeletonSection({ labelWidth = 16, rows = 3 }: { labelWidth?: number; rows?: number }) {
   return (
-    <div className="pt-3 pb-1">
-      <p className="text-[8px] font-mono font-black text-terminal-label tracking-[0.3em] uppercase border-b border-terminal-rule pb-1">
-        {label}
-      </p>
-    </div>
+    <>
+      <div className="pt-3 pb-1">
+        <div className="h-3 bg-terminal-rule animate-pulse" style={{ width: `${labelWidth * 4}px` }} />
+      </div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <SkeletonStatRow key={i} />
+      ))}
+    </>
   );
 }
 
@@ -38,13 +41,26 @@ export default function TerminalStatsBar({
   prediction,
   signalText,
   confidence,
+  isLoading,
 }: Props) {
+  if (isLoading) {
+    return (
+      <div className="space-y-0">
+        <SkeletonSection labelWidth={20} rows={4} />
+        <SkeletonSection rows={2} />
+        <SkeletonSection rows={3} />
+        <SkeletonSection rows={3} />
+        <SkeletonSection rows={2} />
+        <SkeletonSection rows={2} />
+      </div>
+    );
+  }
   const signalClass =
     signalText === 'BUY' ? 'text-terminal-buy' :
     signalText === 'SELL' ? 'text-terminal-sell' : 'text-terminal-hold';
 
   const assetLabel = activeAsset === 'gold' ? 'XAU/USD' : 'XAG/USD';
-  const assetFull  = activeAsset === 'gold' ? 'Gold Futures' : 'Silver Futures';
+  const assetFull  = activeAsset === 'gold' ? 'Gold Spot' : 'Silver Spot';
 
   // Derived from prediction shap if available
   const shapArr = Array.isArray(prediction?.shap_values) ? prediction.shap_values : [];
@@ -57,54 +73,52 @@ export default function TerminalStatsBar({
   return (
     <div className="space-y-0">
       {/* Asset identity */}
-      <SectionHeader label="Instrument" />
-      <StatRow label="SYMBOL" value={assetLabel} />
-      <StatRow label="NAME" value={assetFull} />
-      <StatRow label="CLASS" value="Precious Metals" />
-      <StatRow label="QUOTE" value="USD" />
+      <TerminalSectionHeader label="Instrument" />
+      <TerminalStatRow label="SYMBOL" value={assetLabel} />
+      <TerminalStatRow label="NAME" value={assetFull} />
 
       {/* Pricing */}
-      <SectionHeader label="Pricing" />
-      <StatRow
+      <TerminalSectionHeader label="Pricing" />
+      <TerminalStatRow
         label="LIVE PRICE"
         value={livePrice != null ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
         valueClass="text-terminal-value"
       />
-      <StatRow
+      <TerminalStatRow
         label="MODEL PRICE"
         value={prediction?.price ? `$${prediction.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
       />
 
       {/* Signal */}
-      <SectionHeader label="AI Signal" />
-      <StatRow label="DIRECTION" value={signalText} valueClass={signalClass} />
-      <StatRow label="CONFIDENCE" value={confidence ? `${confidence}%` : '—'} valueClass={signalClass} />
-      <StatRow
+      <TerminalSectionHeader label="AI Signal" />
+      <TerminalStatRow label="DIRECTION" value={signalText} valueClass={signalClass} />
+      <TerminalStatRow label="CONFIDENCE" value={confidence ? `${confidence}%` : '—'} valueClass={signalClass} />
+      <TerminalStatRow
         label="PROBABILITY"
         value={prediction?.probability != null ? `${(prediction.probability * 100).toFixed(1)}%` : '—'}
         valueClass="text-terminal-data"
       />
 
       {/* Model */}
-      <SectionHeader label="Model" />
-      <StatRow label="ALGORITHM" value="XGBoost" />
-      <StatRow label="FEATURES" value="89" />
-      <StatRow label="SHAP VALUES" value={shapCount > 0 ? `${shapCount}` : '—'} />
-      <StatRow label="FRAMEWORK" value="SMCForge v1" />
+      <TerminalSectionHeader label="Model" />
+      <TerminalStatRow label="ALGORITHM" value="XGBoost" />
+      <TerminalStatRow label="FEATURES" value="89" />
+      <TerminalStatRow label="SHAP VALUES" value={shapCount > 0 ? `${shapCount}` : '—'} />
+      <TerminalStatRow label="FRAMEWORK" value="SMCForge v1" />
 
       {/* Drivers */}
       {(topDriverPos || topDriverNeg) && (
         <>
-          <SectionHeader label="Key Drivers" />
+          <TerminalSectionHeader label="Key Drivers" />
           {topDriverPos && (
-            <StatRow
+            <TerminalStatRow
               label="TOP BULLISH"
               value={topDriverPos.feature.replace(/_/g, ' ').slice(0, 16).toUpperCase()}
               valueClass="text-terminal-buy"
             />
           )}
           {topDriverNeg && (
-            <StatRow
+            <TerminalStatRow
               label="TOP BEARISH"
               value={topDriverNeg.feature.replace(/_/g, ' ').slice(0, 16).toUpperCase()}
               valueClass="text-terminal-sell"
@@ -114,14 +128,14 @@ export default function TerminalStatsBar({
       )}
 
       {/* Timestamp */}
-      <SectionHeader label="Timestamp" />
-      <StatRow
+      <TerminalSectionHeader label="Timestamp" />
+      <TerminalStatRow
         label="SIGNAL AT"
         value={prediction?.timestamp
           ? new Date(prediction.timestamp).toLocaleTimeString('en-US', { hour12: false })
           : '—'}
       />
-      <StatRow
+      <TerminalStatRow
         label="DATE"
         value={prediction?.timestamp
           ? new Date(prediction.timestamp).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase()

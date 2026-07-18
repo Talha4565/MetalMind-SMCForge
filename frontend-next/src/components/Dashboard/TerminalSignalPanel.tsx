@@ -107,6 +107,16 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
         </div>
       )}
 
+      {/* Active trade indicator */}
+      {(current as any).trade_active && (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border border-terminal-hold/40 bg-terminal-hold/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-terminal-hold animate-pulse" />
+          <span className="text-[8px] font-mono font-bold text-terminal-hold tracking-widest">
+            TRADE ACTIVE — TP/SL LOCKED
+          </span>
+        </div>
+      )}
+
       {/* Connection status */}
       <div className="flex items-center gap-1.5 px-1">
         {isConnected

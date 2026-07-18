@@ -3,15 +3,16 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
@@ -36,6 +37,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormProps) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -123,7 +125,7 @@ export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormPro
                 <button
                   type="button"
                   className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors ml-auto"
-                  onClick={() => {}}
+                  onClick={() => router.push('/auth/forgot-password')}
                 >
                   Forgot password?
                 </button>

@@ -209,3 +209,90 @@ class PredictionLogger:
         # Sort newest first, apply limit
         records.sort(key=lambda r: r.get('timestamp', ''), reverse=True)
         return records[:limit]
+
+
+class ActiveTradeTracker:
+    """
+    Tracks one active trade per asset with FROZEN TP/SL.
+    When a BUY/SELL signal fires at >65% confidence, the entry/tp/sl
+    are locked until the trade hits TP, hits SL, or is manually closed.
+    No new signals are generated for an asset while it has an active trade.
+    """
+
+    def __init__(self):
+        self._trades: Dict[str, Dict[str, Any]] = {}
+
+    def has_active(self, asset: str) -> bool:
+        return asset in self._trades
+
+    def get_active(self, asset: str) -> Optional[Dict[str, Any]]:
+        return self._trades.get(asset)
+
+    def open_trade(self, asset: str, signal: int, confidence: float,
+                   entry_price: float, tp_price: float, sl_price: float,
+                   shap_values: list = None) -> Dict[str, Any]:
+        """Open a new active trade with frozen TP/SL. Overwrites any existing."""
+        trade = {
+            'asset': asset,
+            'signal': signal,
+            'signal_text': {1: 'BUY', -1: 'SELL', 0: 'HOLD'}.get(signal, 'UNKNOWN'),
+            'confidence': confidence,
+            'entry_price': entry_price,
+            'tp_price': tp_price,
+            'sl_price': sl_price,
+            'shap_values': shap_values or [],
+            'opened_at': datetime.now().isoformat(),
+            'status': 'active',
+        }
+        self._trades[asset] = trade
+        logger.info(f"🔒 ACTIVE TRADE OPENED: {trade['signal_text']} {asset} "
+                     f"entry=${entry_price:.2f} tp=${tp_price:.2f} sl=${sl_price:.2f}")
+        return trade
+
+    def check_outcome(self, asset: str, current_price: float) -> Optional[Dict[str, Any]]:
+        """
+        Check if the active trade's TP or SL has been hit.
+        Returns a dict with outcome info if the trade resolved, None if still active.
+        """
+        trade = self._trades.get(asset)
+        if not trade or trade['status'] != 'active':
+            return None
+
+        entry = trade['entry_price']
+        signal = trade['signal']
+        tp = trade['tp_price']
+        sl = trade['sl_price']
+
+        if signal == 1:  # BUY: price goes UP to hit TP, DOWN to hit SL
+            if current_price >= tp:
+                pnl_pct = (current_price - entry) / entry
+                outcome = 'WIN_TP'
+            elif current_price <= sl:
+                pnl_pct = (current_price - entry) / entry
+                outcome = 'LOSS_SL'
+            else:
+                return None  # Still active
+        else:  # SELL: price goes DOWN to hit TP, UP to hit SL
+            if current_price <= tp:
+                pnl_pct = (entry - current_price) / entry
+                outcome = 'WIN_TP'
+            elif current_price >= sl:
+                pnl_pct = (entry - current_price) / entry
+                outcome = 'LOSS_SL'
+            else:
+                return None  # Still active
+
+        # Trade resolved — close it
+        trade['status'] = 'closed'
+        trade['outcome'] = outcome
+        trade['actual_pnl'] = round(pnl_pct * 100, 2)
+        trade['closed_at'] = datetime.now().isoformat()
+        trade['close_price'] = current_price
+        del self._trades[asset]
+
+        logger.info(f"✅ ACTIVE TRADE CLOSED: {outcome} {asset} "
+                     f"entry=${entry:.2f} exit=${current_price:.2f} pnl={trade['actual_pnl']:+.2f}%")
+        return trade
+
+    def all_active(self) -> Dict[str, Dict[str, Any]]:
+        return dict(self._trades)

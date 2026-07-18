@@ -78,6 +78,7 @@ export interface PredictionItem {
   sl_price?: number;
   timestamp: string;
   shap_values: SHAPValue[];
+  trade_active?: boolean;
 }
 
 export interface PredictionResponse {
@@ -113,6 +114,7 @@ export interface Trade {
 }
 
 export interface BacktestResponse {
+  asset?: string;
   win_rate: number;
   profit_factor: number;
   max_drawdown: number;

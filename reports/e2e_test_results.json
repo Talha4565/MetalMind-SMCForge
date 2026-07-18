@@ -1,124 +1,199 @@
 {
   "summary": {
-    "total": 23,
-    "passed": 0,
-    "failed": 23
+    "total": 38,
+    "passed": 36,
+    "failed": 2
   },
   "tests": [
     {
-      "test": "Health check",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Health check returns 200",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Live price gold",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Database is healthy",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Live price silver",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Filesystem is healthy",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Invalid asset validation",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Gold model loaded",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "GOLD predictions",
+      "test": "Silver model loaded",
       "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "detail": ""
     },
     {
-      "test": "SILVER predictions",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Status is healthy",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Invalid asset prediction",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Live price gold: $4158.135",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Limit validation",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Live price silver: $61.944",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "SHAP endpoint",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Invalid asset returns 400",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Model info",
+      "test": "GOLD predictions returned",
+      "passed": true,
+      "detail": "5 bars, signal=0, conf=65.5%"
+    },
+    {
+      "test": "GOLD has signal field",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "GOLD has confidence field",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "GOLD has SHAP values",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "SILVER predictions returned",
+      "passed": true,
+      "detail": "5 bars, signal=0, conf=35.7%"
+    },
+    {
+      "test": "SILVER has signal field",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "SILVER has confidence field",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "SILVER has SHAP values",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Invalid asset prediction returns 400",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Invalid limit returns 400",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "SHAP endpoint responds",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Gold model info",
       "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "detail": ""
     },
     {
       "test": "Landing page (/)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Login page (/auth/login)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Register page (/auth/register)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Dashboard (/dashboard)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Risk calculator (/dashboard/risk)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Profile page (/dashboard/profile)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Watchlist page (/dashboard/watchlist)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
       "test": "Backtest page (/backtest)",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: "
+      "passed": true,
+      "detail": "Status: 200"
     },
     {
-      "test": "Rate limiting",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Rate limiter active (allowed through or 429)",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Security headers",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "CSP header present",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Socket.IO polling",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "X-Frame-Options present",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Register endpoint",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "X-Content-Type-Options present",
+      "passed": true,
+      "detail": ""
     },
     {
-      "test": "Login endpoint",
-      "passed": false,
-      "detail": "HTTPConnectionPool(host='localhost', port=5000): Max retries exceeded with url: "
+      "test": "Referrer-Policy present",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Permissions-Policy present",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Socket.IO polling endpoint",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Register endpoint responds",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "test": "Login with wrong creds returns error",
+      "passed": true,
+      "detail": ""
     }
   ]
 }

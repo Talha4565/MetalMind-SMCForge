@@ -1,0 +1,186 @@
+{
+  "asset": "gold",
+  "config": {
+    "train_months": 4,
+    "test_months": 1,
+    "step_months": 1
+  },
+  "n_folds": 4,
+  "folds": [
+    {
+      "fold": 1,
+      "train_start": "2025-10-09",
+      "train_end": "2026-02-09",
+      "test_start": "2026-02-09",
+      "test_end": "2026-03-09",
+      "train_rows": 8458,
+      "test_rows": 1984,
+      "n_trades": 25,
+      "win_rate": 0.76,
+      "avg_win": 7.966261154944653,
+      "avg_loss": -4.0,
+      "profit_factor": 1.9915652887361632,
+      "total_return_usd": 127.3589619439484,
+      "total_return_pct": 2.547179238878968,
+      "max_drawdown_pct": -0.1557826835336118,
+      "sharpe_ratio": 15.49976332402186,
+      "sortino_ratio": Infinity,
+      "calmar_ratio": 163.50849665068114,
+      "model_accuracy": 0.8351814516129032,
+      "model_auc": 0.7770227267681515
+    },
+    {
+      "fold": 2,
+      "train_start": "2025-11-09",
+      "train_end": "2026-03-09",
+      "test_start": "2026-03-09",
+      "test_end": "2026-04-09",
+      "train_rows": 8291,
+      "test_rows": 2176,
+      "n_trades": 48,
+      "win_rate": 0.6875,
+      "avg_win": 7.999999999999998,
+      "avg_loss": -4.0,
+      "profit_factor": 1.9999999999999996,
+      "total_return_usd": 203.99999999999994,
+      "total_return_pct": 4.079999999999999,
+      "max_drawdown_pct": -0.3968253968253954,
+      "sharpe_ratio": 12.002588104743126,
+      "sortino_ratio": 1.2023400431617597e+17,
+      "calmar_ratio": 53.550000000000175,
+      "model_accuracy": 0.8125,
+      "model_auc": 0.7914720846001186
+    },
+    {
+      "fold": 3,
+      "train_start": "2025-12-09",
+      "train_end": "2026-04-09",
+      "test_start": "2026-04-09",
+      "test_end": "2026-05-09",
+      "train_rows": 8355,
+      "test_rows": 2227,
+      "n_trades": 20,
+      "win_rate": 0.85,
+      "avg_win": 5.816076362178642,
+      "avg_loss": -4.0,
+      "profit_factor": 1.4540190905446606,
+      "total_return_usd": 86.87329815703694,
+      "total_return_pct": 1.737465963140739,
+      "max_drawdown_pct": -0.15711303880397987,
+      "sharpe_ratio": 14.889793779594603,
+      "sortino_ratio": Infinity,
+      "calmar_ratio": 138.2337500731294,
+      "model_accuracy": 0.8509205208801077,
+      "model_auc": 0.7103017147088023
+    },
+    {
+      "fold": 4,
+      "train_start": "2026-01-09",
+      "train_end": "2026-05-09",
+      "test_start": "2026-05-09",
+      "test_end": "2026-06-09",
+      "train_rows": 8483,
+      "test_rows": 2233,
+      "n_trades": 27,
+      "win_rate": 0.7777777777777778,
+      "avg_win": 7.61950236968191,
+      "avg_loss": -4.0,
+      "profit_factor": 1.9048755924204774,
+      "total_return_usd": 136.00954976332014,
+      "total_return_pct": 2.7201909952664027,
+      "max_drawdown_pct": -0.23382653293295697,
+      "sharpe_ratio": 15.866245465299885,
+      "sortino_ratio": Infinity,
+      "calmar_ratio": 107.7164055932683,
+      "model_accuracy": 0.890729959695477,
+      "model_auc": 0.7777836065064155
+    }
+  ],
+  "aggregated": {
+    "win_rate": {
+      "mean": 0.7688194444444444,
+      "std": 0.05779526144391398,
+      "min": 0.6875,
+      "max": 0.85,
+      "n": 4
+    },
+    "profit_factor": {
+      "mean": 1.8376149929253252,
+      "std": 0.22457704060665362,
+      "min": 1.4540190905446606,
+      "max": 1.9999999999999996,
+      "n": 4
+    },
+    "sharpe_ratio": {
+      "mean": 14.564597668414867,
+      "std": 1.5197423552722982,
+      "min": 12.002588104743126,
+      "max": 15.866245465299885,
+      "n": 4
+    },
+    "sortino_ratio": {
+      "mean": 1.2023400431617597e+17,
+      "std": 0.0,
+      "min": 1.2023400431617597e+17,
+      "max": 1.2023400431617597e+17,
+      "n": 1
+    },
+    "calmar_ratio": {
+      "mean": 115.75216307926976,
+      "std": 40.987106631416026,
+      "min": 53.550000000000175,
+      "max": 163.50849665068114,
+      "n": 4
+    },
+    "max_drawdown_pct": {
+      "mean": -0.235886913023986,
+      "std": 0.09814205466604507,
+      "min": -0.3968253968253954,
+      "max": -0.1557826835336118,
+      "n": 4
+    },
+    "n_trades": {
+      "mean": 30.0,
+      "std": 10.700467279516348,
+      "min": 20.0,
+      "max": 48.0,
+      "n": 4
+    },
+    "total_return_pct": {
+      "mean": 2.771209049321527,
+      "std": 0.841776502198021,
+      "min": 1.737465963140739,
+      "max": 4.079999999999999,
+      "n": 4
+    },
+    "model_accuracy": {
+      "mean": 0.8473329830471219,
+      "std": 0.02853578645349934,
+      "min": 0.8125,
+      "max": 0.890729959695477,
+      "n": 4
+    },
+    "model_auc": {
+      "mean": 0.764145033145872,
+      "std": 0.03161374842469237,
+      "min": 0.7103017147088023,
+      "max": 0.7914720846001186,
+      "n": 4
+    }
+  },
+  "single_split": {
+    "n_trades": 72,
+    "win_rate": 0.6111111111111112,
+    "avg_win": 7.05633636066814,
+    "avg_loss": -3.651964041796237,
+    "profit_factor": 1.9322031323171092,
+    "total_return_usd": 208.22380669910348,
+    "total_return_pct": 4.1644761339820695,
+    "max_drawdown_pct": -0.4676315940791098,
+    "sharpe_ratio": 8.354405214413921,
+    "sortino_ratio": 42.69811250892965,
+    "calmar_ratio": 30.921748571762276,
+    "model_accuracy": 0.8343994314143568,
+    "model_auc": 0.7540332261937033
+  }
+}

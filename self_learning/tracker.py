@@ -15,31 +15,47 @@ logger = logging.getLogger(__name__)
 
 class OutcomeTracker:
     """Tracks trade outcomes and feature performance."""
-    
+
     def __init__(self, data_dir: str = None):
         from config.settings import REPORTS_DIR
         self.data_dir = Path(data_dir) if data_dir else REPORTS_DIR / 'learning'
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.outcomes_file = self.data_dir / 'trade_outcomes.jsonl'
         self.feature_stats_file = self.data_dir / 'feature_stats.json'
+        # Dedup: load existing signal IDs so restarts don't re-log everything
+        self._seen_ids: set = self._load_existing_ids()
+
+    def _load_existing_ids(self) -> set:
+        """Load already-logged signal IDs to prevent duplicate logging on restart."""
+        ids = set()
+        if self.outcomes_file.exists():
+            try:
+                for line in self.outcomes_file.read_text().splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                        sid = record.get('signal_id')
+                        if sid:
+                            ids.add(sid)
+                    except json.JSONDecodeError:
+                        continue
+            except Exception:
+                pass
+        return ids
     
-    def log_outcome(self, signal_id: str, asset: str, signal: int, 
+    def log_outcome(self, signal_id: str, asset: str, signal: int,
                    confidence: float, price: float, entry_price: float,
                    outcome: str, pnl: float, features: Dict[str, float] = None):
         """
         Log a trade outcome with its features.
-        
-        Args:
-            signal_id: Unique signal identifier
-            asset: Asset name (gold/silver)
-            signal: Signal direction (1=BUY, -1=SELL)
-            confidence: Model confidence at prediction time
-            price: Current price
-            entry_price: Entry price when signal was generated
-            outcome: 'WIN' or 'LOSS'
-            pnl: Actual PnL percentage
-            features: Dict of feature values at prediction time
+        Skips if signal_id was already logged (dedup across restarts).
         """
+        if signal_id in self._seen_ids:
+            return  # Already logged — skip
+        self._seen_ids.add(signal_id)
+
         record = {
             'timestamp': datetime.now().isoformat(),
             'signal_id': signal_id,

@@ -1,0 +1,154 @@
+@startuml Domain_Model
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+left to right direction
+
+' === Entities ===
+
+class User {
+  + user_id : int
+  + email : string
+  + username : string
+  + password_hash : string
+  + is_verified : bool
+  + totp_enabled : bool
+  + created_at : datetime
+  --
+  + register()
+  + login()
+  + logout()
+}
+
+class Forecast {
+  + forecast_id : int
+  + timestamp : datetime
+  + signal : int (1=BUY, -1=SELL, 0=HOLD)
+  + confidence : float
+  + probability : float
+  + entry_price : float
+  + tp_price : float
+  + sl_price : float
+  + shap_values : json
+  + actual_outcome : string
+  + actual_pnl : float
+  + trade_active : bool
+  --
+  + compute_shap()
+  + check_outcome()
+}
+
+class Watchlist {
+  + watchlist_id : int
+  + created_at : datetime
+  --
+  + add_item()
+  + remove_item()
+  + get_items()
+}
+
+class WatchlistItem {
+  + item_id : int
+  + symbol : string
+  + display_name : string
+  + notifications_enabled : bool
+  + alert_threshold : float
+  + order : int
+  --
+  + toggle_alert()
+}
+
+class Commodity {
+  + commodity_id : int
+  + symbol : string (XAU/USD, XAG/USD)
+  + name : string
+  + asset_type : string
+  --
+  + get_price()
+  + get_ohlcv()
+}
+
+class Backtest {
+  + backtest_id : int
+  + strategy : string
+  + start_date : date
+  + end_date : date
+  + initial_capital : float
+  + win_rate : float
+  + profit_factor : float
+  + sharpe_ratio : float
+  + max_drawdown : float
+  + net_profit : float
+  + total_trades : int
+  + created_at : datetime
+  --
+  + run()
+  + compute_metrics()
+}
+
+class Report {
+  + report_id : int
+  + format : string (CSV, PDF)
+  + generated_at : datetime
+  + file_path : string
+  --
+  + export_csv()
+  + export_pdf()
+}
+
+class OHLCV_Data {
+  + record_id : int
+  + date : date
+  + time : time
+  + open : float
+  + high : float
+  + low : float
+  + close : float
+  + volume : float
+  + timeframe : string (5m, 15m, 30m, 1h)
+  --
+  + get_candle()
+  + to_dataframe()
+}
+
+' === Relationships ===
+
+User "1" -- "N" Forecast : produces >
+User "1" -- "1" Watchlist : owns >
+User "1" -- "N" Backtest : runs >
+
+Watchlist "1" -- "N" WatchlistItem : tracks >
+
+WatchlistItem "N" -- "1" Commodity : references >
+
+Backtest "1" -- "N" Report : generates >
+
+Commodity "1" -- "N" OHLCV_Data : has price history >
+
+Commodity "1" -- "N" Forecast : associated with >
+Commodity "1" -- "N" Backtest : associated with >
+
+note top of Forecast
+  Every prediction triggers
+  SHAP explainability (UC-04).
+  Active trades freeze TP/SL
+  until WIN_TP or LOSS_SL.
+end note
+
+note bottom of OHLCV_Data
+  Stored as CSV files:
+  Gold_15m_Candlestick.csv
+  Silver_15m_Candlestick.csv
+  + 5m, 30m, 1h files.
+  2004–present, ~60K rows.
+end note
+
+note right of Backtest
+  Walk-forward validation.
+  Configurable capital,
+  date range, and strategy.
+  Metrics: Sharpe, Sortino,
+  Calmar, profit factor.
+end note
+
+@enduml

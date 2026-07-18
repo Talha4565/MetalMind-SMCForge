@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { LoginForm } from '@/components/Auth/LoginForm';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import ThemeToggle from '@/components/Common/ThemeToggle';
 import { Instrument_Serif, IBM_Plex_Mono } from 'next/font/google';
+import { apiClient } from '@/lib/api-client';
 
 const serif = Instrument_Serif({
   subsets: ['latin'],
@@ -28,14 +29,55 @@ type LoginValues = {
   totp_code?: string;
 };
 
-// Static display data for the ticker strip — swap for a live feed later if desired.
-const TICKER_ITEMS = [
-  { label: 'XAU/USD', value: '3,412.85', delta: '+0.42%', up: true },
-  { label: 'XAG/USD', value: '38.91', delta: '-0.18%', up: false },
-  { label: 'DXY', value: '97.42', delta: '+0.09%', up: true },
-  { label: 'XAU/XAG', value: '87.71', delta: '+0.61%', up: true },
-  { label: 'MODEL', value: 'XG-7', delta: 'LOCKED', up: true },
-];
+// Live ticker that fetches real prices from the API
+function LiveTickerStrip() {
+  interface TickerItem { label: string; value: string; delta: string; up: boolean }
+  const [items, setItems] = useState<TickerItem[]>([
+    { label: 'XAU/USD', value: '—', delta: 'LOADING', up: true },
+    { label: 'XAG/USD', value: '—', delta: 'LOADING', up: true },
+  ]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchPrices = async () => {
+      try {
+        const [gold, silver] = await Promise.all([
+          apiClient.getLivePrice('gold'),
+          apiClient.getLivePrice('silver'),
+        ]);
+        if (!mounted) return;
+        setItems([
+          { label: 'XAU/USD', value: gold.price.toLocaleString(undefined, { minimumFractionDigits: 2 }), delta: 'LIVE', up: true },
+          { label: 'XAG/USD', value: silver.price.toLocaleString(undefined, { minimumFractionDigits: 2 }), delta: 'LIVE', up: true },
+        ]);
+      } catch {
+        if (mounted) {
+          setItems([
+            { label: 'XAU/USD', value: '—', delta: 'OFFLINE', up: false },
+            { label: 'XAG/USD', value: '—', delta: 'OFFLINE', up: false },
+          ]);
+        }
+      }
+    };
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 30000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  const tickerLoop = [...items, ...items, ...items, ...items, ...items];
+
+  return (
+    <div className="flex animate-[ticker_32s_linear_infinite] gap-10 px-6 py-2" style={{ width: 'max-content', fontFamily: 'var(--font-mono)' }}>
+      {tickerLoop.map((t, i) => (
+        <span key={i} className="flex items-center gap-2 text-[11px] tracking-wide text-[#8B9099]">
+          <span className="text-[#5C5C59]">{t.label}</span>
+          <span className="text-[#EDEAE3]">{t.value}</span>
+          <span className={t.up ? 'text-[#B8935A]' : 'text-[#8B9099]'}>{t.delta}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -84,26 +126,13 @@ export default function LoginPage() {
     }
   };
 
-  const tickerLoop = [...TICKER_ITEMS, ...TICKER_ITEMS, ...TICKER_ITEMS];
-
   return (
     <div
       className={`${serif.variable} ${mono.variable} relative min-h-screen overflow-hidden bg-[#0A0A0B] text-[#EDEAE3]`}
     >
-      {/* Ticker strip — signature element, doubles as brand proof */}
+      {/* Ticker strip — live prices from API */}
       <div className="relative overflow-hidden whitespace-nowrap border-b border-white/[0.06]">
-        <div
-          className="flex animate-[ticker_32s_linear_infinite] gap-10 px-6 py-2"
-          style={{ width: 'max-content', fontFamily: 'var(--font-mono)' }}
-        >
-          {tickerLoop.map((t, i) => (
-            <span key={i} className="flex items-center gap-2 text-[11px] tracking-wide text-[#8B9099]">
-              <span className="text-[#5C5C59]">{t.label}</span>
-              <span className="text-[#EDEAE3]">{t.value}</span>
-              <span className={t.up ? 'text-[#B8935A]' : 'text-[#8B9099]'}>{t.delta}</span>
-            </span>
-          ))}
-        </div>
+        <LiveTickerStrip />
       </div>
 
       <div className="absolute right-6 top-14 z-50">
@@ -152,6 +181,11 @@ export default function LoginPage() {
               No account?{' '}
               <Link href="/auth/register" className="text-[#B8935A] hover:text-[#D1AC79]">
                 Register
+              </Link>
+            </p>
+            <p className="mt-3 text-center">
+              <Link href="/auth/forgot-password" className="text-[11px] text-[#5C5C59] hover:text-[#B8935A] transition-colors">
+                Forgot password?
               </Link>
             </p>
           </div>

@@ -20,10 +20,10 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number')
-    .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Password must contain at least one special character'),
+    .regex(/[A-Z]/, 'Must contain an uppercase letter')
+    .regex(/[a-z]/, 'Must contain a lowercase letter')
+    .regex(/[0-9]/, 'Must contain a number')
+    .regex(/[!@#$%^&*(),.?":{}|<>]/, 'Must contain a special character'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -43,11 +43,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      confirmPassword: '',
-    },
+    defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
   return (
@@ -58,9 +54,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
           name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-muted-foreground text-xs font-medium">
-                Email
-              </FormLabel>
+              <FormLabel className="text-slate-400 text-xs font-medium">Email</FormLabel>
               <FormControl>
                 <Input
                   placeholder="name@example.com"
@@ -79,9 +73,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-muted-foreground text-xs font-medium">
-                Password
-              </FormLabel>
+              <FormLabel className="text-slate-400 text-xs font-medium">Password</FormLabel>
               <div className="relative">
                 <FormControl>
                   <Input
@@ -101,7 +93,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
                 </button>
               </div>
               <FormMessage className="text-xs" />
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-[10px] text-[#5C5C59] mt-1">
                 Min 8 chars, uppercase, lowercase, number, special character
               </p>
             </FormItem>
@@ -113,9 +105,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
           name="confirmPassword"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-muted-foreground text-xs font-medium">
-                Confirm password
-              </FormLabel>
+              <FormLabel className="text-slate-400 text-xs font-medium">Confirm password</FormLabel>
               <div className="relative">
                 <FormControl>
                   <Input
@@ -141,7 +131,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
 
         <Button
           type="submit"
-          className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-all shadow-lg shadow-emerald-600/20"
+          className="w-full h-11 bg-[#B8935A] hover:bg-[#D1AC79] text-[#0A0A0B] font-bold transition-all"
           disabled={isLoading}
         >
           {isLoading ? (

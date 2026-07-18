@@ -1,10 +1,10 @@
 {
-  "last_update": "2026-06-16T17:35:49.456802",
-  "last_retrain": "2026-06-16T17:35:49.457893",
-  "update_status": "success",
+  "last_update": "2026-07-18T06:19:39.899827",
+  "last_retrain": "2026-07-14T13:30:47.595694",
+  "update_status": "failed",
   "retrain_status": "success",
-  "update_error": null,
+  "update_error": "Data is 30.3h old (max: 25h)",
   "retrain_error": null,
-  "consecutive_failures": 0,
+  "consecutive_failures": 4,
   "uptime_since": "2026-06-16T17:35:47.816560"
 }
