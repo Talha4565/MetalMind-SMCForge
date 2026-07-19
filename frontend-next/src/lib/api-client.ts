@@ -308,6 +308,23 @@ class ApiClient {
     return response.data;
   }
 
+  // Settings
+  async getSettings(): Promise<{ settings: Record<string, unknown> }> {
+    const response = await this.client.get<{ settings: Record<string, unknown> }>('/api/profile/settings');
+    return response.data;
+  }
+
+  async updateSettings(data: Record<string, unknown>): Promise<{ message: string; settings: Record<string, unknown> }> {
+    const response = await this.client.put<{ message: string; settings: Record<string, unknown> }>('/api/profile/settings', data);
+    return response.data;
+  }
+
+  // Account
+  async deleteAccount(password: string): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>('/api/profile/delete', { data: { password } });
+    return response.data;
+  }
+
   async verifyEmail(data: { email: string; otp_code: string }): Promise<{ success: boolean; message: string }> {
     const response = await this.client.post<{ success: boolean; message: string }>('/api/auth/verify-email', data);
     return response.data;

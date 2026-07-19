@@ -1264,7 +1264,7 @@ def get_backtest_results():
 
 
 @app.route('/api/backtest/run', methods=['POST'])
-@limiter.limit("1 per hour")
+@limiter.limit("6 per hour")
 def run_backtest():
     """Run backtest with specified parameters."""
     try:
@@ -1508,7 +1508,7 @@ def get_model_info(current_user_email):
         if asset == "gold":
             model_path = MODELS_DIR / 'enhanced_15m.pkl'
         else:
-            model_path = MODELS_DIR / 'processed' / 'silver_model_enhanced.pkl'
+            model_path = MODELS_DIR / 'silver_enhanced_15m.pkl'
         
         # Get file modification time
         import os

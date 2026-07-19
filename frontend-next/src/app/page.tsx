@@ -79,33 +79,52 @@ export default function Home() {
           </p>
         </div>
 
-        {/* ── Gold-foil metric cards ── */}
-        <div className="w-full max-w-2xl pt-6">
-          <div className="grid grid-cols-3 gap-5">
-            <div className="group rounded-xl border border-[#d4af37]/20 bg-[#0a0b0f] px-6 py-7 text-center transition-all duration-500 hover:border-[#d4af37]/50 hover:shadow-[0_0_30px_-6px_rgba(212,175,55,0.1)]">
-              <h2 className="text-3xl md:text-4xl font-black font-mono text-[#e8e4dc] tabular-nums">
-                XAU
+        {/* ── Hero destination cards: Gold & Silver ── */}
+        <div className="w-full max-w-3xl pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* ── Gold Hero Card ── */}
+            <Link
+              href="/dashboard/gold"
+              className="group flex flex-col rounded-xl border border-[#d4af37]/30 bg-[#0a0b0f] px-8 py-8 text-left transition-all duration-500 hover:border-[#d4af37]/60 hover:shadow-[0_0_30px_-6px_rgba(212,175,55,0.15)] hover:scale-[1.02]"
+            >
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#d4af37] font-semibold">
+                🥇 GOLD
+              </span>
+              <h2 className="font-black font-mono text-4xl text-[#e8e4dc] mt-3">
+                XAU/USD
               </h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#d4af37] mt-2.5 font-semibold">
-                Gold
+              <span className="inline-block mt-2 text-sm font-semibold text-[#16b979]">
+                82.7% accuracy
+              </span>
+              <p className="mt-2 text-sm text-[#8a8578]/80 leading-relaxed">
+                ML-powered signals. 100 features. SHAP explainability.
               </p>
-            </div>
-            <div className="group rounded-xl border border-[#d4af37]/20 bg-[#0a0b0f] px-6 py-7 text-center transition-all duration-500 hover:border-[#d4af37]/50 hover:shadow-[0_0_30px_-6px_rgba(212,175,55,0.1)]">
-              <h2 className="text-3xl md:text-4xl font-black font-mono text-[#e8e4dc] tabular-nums">
-                XAG
+              <span className="mt-auto pt-5 text-sm font-medium text-[#d4af37] group-hover:brightness-125 transition-all duration-300">
+                Open Gold Dashboard →
+              </span>
+            </Link>
+
+            {/* ── Silver Hero Card ── */}
+            <Link
+              href="/dashboard/silver"
+              className="group flex flex-col rounded-xl border border-[#b0b8c8]/30 bg-[#0a0b0f] px-8 py-8 text-left transition-all duration-500 hover:border-[#b0b8c8]/60 hover:shadow-[0_0_30px_-6px_rgba(176,184,200,0.12)] hover:scale-[1.02]"
+            >
+              <span className="text-[10px] uppercase tracking-[0.2em] text-[#b0b8c8] font-semibold">
+                🥈 SILVER
+              </span>
+              <h2 className="font-black font-mono text-4xl text-[#e8e4dc] mt-3">
+                XAG/USD
               </h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#8a8578] mt-2.5 font-semibold">
-                Silver
+              <span className="inline-block mt-2 text-sm font-semibold text-[#f59e0b]">
+                73.9% accuracy
+              </span>
+              <p className="mt-2 text-sm text-[#8a8578]/80 leading-relaxed">
+                Same XGBoost engine. Separate tuned parameters. 89 features.
               </p>
-            </div>
-            <div className="group rounded-xl border border-[#d4af37]/20 bg-[#0a0b0f] px-6 py-7 text-center transition-all duration-500 hover:border-[#d4af37]/50 hover:shadow-[0_0_30px_-6px_rgba(212,175,55,0.1)]">
-              <h2 className="text-3xl md:text-4xl font-black font-mono text-[#d4af37] tabular-nums">
-                20Y
-              </h2>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#8a8578] mt-2.5 font-semibold">
-                Tick Data
-              </p>
-            </div>
+              <span className="mt-auto pt-5 text-sm font-medium text-[#b0b8c8] group-hover:brightness-125 transition-all duration-300">
+                Open Silver Dashboard →
+              </span>
+            </Link>
           </div>
         </div>
 

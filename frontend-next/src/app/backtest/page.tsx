@@ -164,6 +164,13 @@ export default function BacktestPage() {
                   className="bg-terminal-panel border-terminal-rule text-terminal-value font-mono text-xs rounded-none" min={100} step={100} />
               </div>
 
+              {/* Error display — always visible, outside the progress gate */}
+              {backtestError && (
+                <div className="space-y-1 px-3 py-2 border border-terminal-sell/30 bg-terminal-sell/5">
+                  <p className="text-[10px] font-mono text-terminal-sell font-bold">{backtestError}</p>
+                </div>
+              )}
+
               {(runBacktest.isPending || progress > 0) && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-[9px] font-mono">
@@ -174,7 +181,6 @@ export default function BacktestPage() {
                     <div className={cn("h-full transition-all duration-500", backtestError ? "bg-terminal-sell" : backtestDone ? "bg-terminal-buy" : "bg-terminal-hold")}
                       style={{ width: `${progress}%` }} />
                   </div>
-                  {backtestError && <p className="text-[9px] font-mono text-terminal-sell mt-1">{backtestError}</p>}
                   {backtestDone && (
                     <p className="text-[9px] font-mono text-terminal-buy mt-1 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" /> Backtest completed
