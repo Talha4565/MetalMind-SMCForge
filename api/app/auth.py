@@ -194,7 +194,6 @@ def register():
             'email': email,
             'otp_sent': otp_sent,
             'dev_verified': is_dev,
-            'otp_code': otp_code if is_dev else None  # Return OTP in dev for testing
         }), 201
     
     except Exception as e:
@@ -217,7 +216,7 @@ def verify_email():
         # Find user
         user = User.query.filter_by(email=email).first()
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'error': 'User not found'}), 400
         
         # Find valid OTP
         otp = OTPCode.query.filter_by(
@@ -265,7 +264,7 @@ def resend_otp():
         # Find user in database
         user = User.query.filter_by(email=email).first()
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'error': 'User not found'}), 400
         
         # FIXED: Use centralized security service
         otp_code = security_service.generate_otp()
