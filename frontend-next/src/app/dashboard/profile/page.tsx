@@ -47,6 +47,7 @@ interface UserSettings {
   email_notifications?: boolean;
   default_timeframe?: string;
   default_asset?: string;
+  timezone?: string;
 }
 
 export default function ProfilePage() {
@@ -247,7 +248,7 @@ export default function ProfilePage() {
             <Save className="w-3 h-3" /> SAVE
           </TerminalButton>
         }>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5">
             <div className="space-y-1.5">
               <p className="text-[9px] font-mono font-bold uppercase tracking-widest text-terminal-label">Theme</p>
               <select
@@ -271,7 +272,7 @@ export default function ProfilePage() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <p className="text-[9px] font-mono font-bold uppercase tracking-widest text-terminal-label">Default Timeframe</p>
+              <p className="text-[9px] font-mono font-bold uppercase tracking-widest text-terminal-label">Timeframe</p>
               <select
                 value={settings?.default_timeframe || '15m'}
                 onChange={e => handleSettingsChange('default_timeframe', e.target.value)}
@@ -281,6 +282,23 @@ export default function ProfilePage() {
                 <option value="15m">15m</option>
                 <option value="30m">30m</option>
                 <option value="1h">1h</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-[9px] font-mono font-bold uppercase tracking-widest text-terminal-label">Timezone</p>
+              <select
+                value={settings?.timezone || 'Asia/Karachi'}
+                onChange={e => handleSettingsChange('timezone', e.target.value)}
+                className="w-full bg-terminal-panel border border-terminal-rule text-terminal-value font-mono text-xs rounded-none px-3 py-2 focus:border-terminal-hold"
+              >
+                <option value="Asia/Karachi">UTC+5 (Pakistan)</option>
+                <option value="Asia/Dubai">UTC+4 (Dubai)</option>
+                <option value="Europe/London">UTC+0 (London)</option>
+                <option value="America/New_York">UTC-5 (New York)</option>
+                <option value="America/Chicago">UTC-6 (Chicago)</option>
+                <option value="Asia/Tokyo">UTC+9 (Tokyo)</option>
+                <option value="Asia/Shanghai">UTC+8 (Shanghai)</option>
+                <option value="UTC">UTC</option>
               </select>
             </div>
             <div className="space-y-2">

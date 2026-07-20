@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/Common/DashboardLayout';
 import TerminalCard, { TerminalButton } from '@/components/Common/TerminalCard';
 import { usePredictionHistory } from '@/lib/hooks/usePredictionHistory';
 import { PredictionLogItem } from '@/lib/api-types';
+import { apiClient } from '@/lib/api-client';
 import { TrendingUp, TrendingDown, Minus, Clock, RefreshCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +37,14 @@ function signalColor(signal: number) {
 export default function TradeLogPage() {
   const [days, setDays] = useState(7);
   const [asset, setAsset] = useState('');
+  const [timezone, setTimezone] = useState('Asia/Karachi');
   const { data, isLoading, refetch, isRefetching } = usePredictionHistory(days, asset || undefined);
+
+  useEffect(() => {
+    apiClient.getSettings().then(s => {
+      if (s.settings?.timezone) setTimezone(s.settings.timezone as string);
+    }).catch(() => {});
+  }, []);
 
   const predictions = data?.predictions ?? [];
   const summary = data?.summary;
@@ -121,7 +129,7 @@ export default function TradeLogPage() {
                   predictions.map((p: PredictionLogItem, i: number) => (
                     <tr key={i} className="border-b border-terminal-rule hover:bg-terminal-hold/5 transition-colors">
                       <td className="px-4 py-2.5 font-mono text-[10px] text-terminal-value tabular-nums whitespace-nowrap">
-                        {new Date(p.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })}
+                        {new Date(p.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone })}
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={cn('text-[10px] font-mono font-bold uppercase tracking-wider', p.asset === 'gold' ? 'text-terminal-hold' : 'text-terminal-label')}>{p.asset}</span>
