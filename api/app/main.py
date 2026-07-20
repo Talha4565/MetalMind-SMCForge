@@ -743,23 +743,15 @@ def get_latest_predictions():
         from features.v4_features import compute_v4_features
         df = compute_v4_features(df)
         
-        # Inject current live price from MT5 cache into the latest bar
-        try:
-            cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
-            if cache_path.exists():
-                with open(cache_path, encoding='utf-8-sig') as f:
-                    cache = json.load(f)
-                if asset in cache.get('prices', {}):
-                    live_price = cache['prices'][asset]['price']
-                    latest_idx = df.index[-1]
-                    df.loc[latest_idx, 'close'] = live_price
-                    df.loc[latest_idx, 'open'] = live_price
-                    df.loc[latest_idx, 'high'] = live_price
-                    df.loc[latest_idx, 'low'] = live_price
-                    df.loc[latest_idx, 'price'] = live_price
-                    logger.info(f"Injected MT5 live price ${live_price:.2f} into latest {asset} bar")
-        except Exception as e:
-            logger.warning(f"Could not load MT5 live price: {e}")
+        # NOTE: DO NOT inject MT5 live price into OHLCV bars.
+        # The model is trained on completed candles with real OHLCV data.
+        # Overwriting O=H=L=C with a single bid/ask midpoint creates a flat candle
+        # (zero range, zero body) that contaminates volatility, candle pattern,
+        # SMC, and multi-timeframe features for the most recent bar.
+        # MT5 live price is used ONLY for display in the API response (/api/market/price).
+        # To use the current in-progress bar for prediction, MT5 must provide
+        # the full OHLC of the current uncompleted candle (MqlRates struct),
+        # not just a single bid/ask snapshot.
         
         # Get most recent N bars
         recent_data = df.iloc[-limit:].copy()
