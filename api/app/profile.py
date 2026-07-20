@@ -19,6 +19,7 @@ from api.app.services.password_service import password_service
 from api.app.services.validation_service import validation_service
 from api.app.services.email_service import email_service
 from api.app.auth import token_required as auth_token_required
+from api.app.extensions import limiter
 import re
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ def token_required(f):
 
 @profile_bp.route('', methods=['GET'])
 @token_required
+@limiter.limit("30 per minute")
 def get_profile(current_user):
     """
     Get user profile information.
@@ -58,6 +60,7 @@ def get_profile(current_user):
 
 @profile_bp.route('', methods=['PUT'])
 @token_required
+@limiter.limit("10 per minute")
 def update_profile(current_user):
     """
     Update user profile information.
@@ -80,6 +83,8 @@ def update_profile(current_user):
         new_name = data['name'].strip()
         if len(new_name) < 2:
             return jsonify({'error': 'Name must be at least 2 characters'}), 400
+        if len(new_name) > 100:
+            return jsonify({'error': 'Name must be at most 100 characters'}), 400
         current_user.name = new_name
     
     # Update email if provided
@@ -90,6 +95,9 @@ def update_profile(current_user):
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_regex, new_email):
             return jsonify({'error': 'Invalid email format'}), 400
+        
+        if len(new_email) > 255:
+            return jsonify({'error': 'Email must be at most 255 characters'}), 400
         
         # Check if email already exists
         if new_email != current_user.email:
@@ -130,6 +138,7 @@ def update_profile(current_user):
 
 @profile_bp.route('/password', methods=['PUT'])
 @token_required
+@limiter.limit("5 per minute")
 def change_password(current_user):
     """
     Change user password.
@@ -270,6 +279,7 @@ def update_settings(current_user):
 
 @profile_bp.route('/2fa/setup', methods=['GET'])
 @token_required
+@limiter.limit("3 per minute")
 def get_2fa_setup(current_user):
     """Return provisioning URI and QR code image for TOTP setup."""
     try:
@@ -305,6 +315,7 @@ def get_2fa_setup(current_user):
 
 @profile_bp.route('/2fa/enable', methods=['POST'])
 @token_required
+@limiter.limit("3 per minute")
 def enable_2fa(current_user):
     """Enable TOTP 2FA after verifying provided OTP code."""
     data = request.get_json() or {}
@@ -333,6 +344,7 @@ def enable_2fa(current_user):
 
 @profile_bp.route('/2fa/disable', methods=['POST'])
 @token_required
+@limiter.limit("3 per minute")
 def disable_2fa(current_user):
     """Disable TOTP 2FA after verifying provided OTP code."""
     data = request.get_json() or {}

@@ -37,8 +37,8 @@ if not _refresh_secret:
         raise RuntimeError("REFRESH_SECRET_KEY environment variable must be set in production")
     _refresh_secret = 'dev-refresh-secret-not-for-production'
 REFRESH_SECRET_KEY = _refresh_secret
-ACCESS_TOKEN_EXPIRY = timedelta(minutes=15)
-REFRESH_TOKEN_EXPIRY = timedelta(days=7)
+ACCESS_TOKEN_EXPIRY = timedelta(hours=24)
+REFRESH_TOKEN_EXPIRY = timedelta(days=30)
 OTP_EXPIRY = timedelta(minutes=10)
 
 # ==================== HELPER FUNCTIONS ====================
@@ -157,18 +157,18 @@ def register():
         # Generate TOTP secret for 2FA
         totp_secret = pyotp.random_base32()
         
-        # Create user - auto-verify in development
+        # Create user - auto-verify in development for easier login
         is_dev = os.environ.get('FLASK_ENV') == 'development'
         new_user = User(
             email=email,
             password_hash=password_hash,
             totp_secret=totp_secret,
-            is_verified=is_dev  # Auto-verify in dev, require OTP in prod
+            is_verified=is_dev  # Auto-verify in dev so login works immediately
         )
         db.session.add(new_user)
         db.session.flush()  # Get user ID
         
-        # FIXED: Use centralized security service
+        # Generate OTP code
         otp_code = security_service.generate_otp()
         otp = OTPCode(
             user_id=new_user.id,
@@ -178,16 +178,22 @@ def register():
         db.session.add(otp)
         db.session.commit()
         
-        # Send OTP email (only in production)
-        if not is_dev:
+        # Always attempt to send OTP email (even in dev)
+        # In dev, email won't actually send but the flow is demonstrated
+        otp_sent = False
+        try:
             send_otp_email(email, otp_code)
+            otp_sent = True
+            logger.info(f"OTP email sent to {email}")
+        except Exception as e:
+            logger.warning(f"Could not send OTP email: {e}")
         
         return jsonify({
             'success': True,
-            'message': 'Registration successful.' + (' You can log in now.' if is_dev else ' Please verify your email with the OTP sent.'),
+            'message': 'Registration successful. Please verify your email with the OTP sent.',
             'email': email,
-            'otp_sent': not is_dev,
-            'dev_verified': is_dev
+            'otp_sent': otp_sent,
+            'dev_verified': is_dev,
         }), 201
     
     except Exception as e:
@@ -210,7 +216,7 @@ def verify_email():
         # Find user
         user = User.query.filter_by(email=email).first()
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'error': 'User not found'}), 400
         
         # Find valid OTP
         otp = OTPCode.query.filter_by(
@@ -258,7 +264,7 @@ def resend_otp():
         # Find user in database
         user = User.query.filter_by(email=email).first()
         if not user:
-            return jsonify({'error': 'User not found'}), 404
+            return jsonify({'error': 'User not found'}), 400
         
         # FIXED: Use centralized security service
         otp_code = security_service.generate_otp()
@@ -411,6 +417,120 @@ def refresh_access_token():
         'access_token': new_access_token,
         'token_type': 'Bearer'
     }), 200
+
+
+# ============================================================================
+# FORGOT PASSWORD ENDPOINTS
+# ============================================================================
+
+import hashlib
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("5 per hour")
+def forgot_password():
+    """
+    Send password reset email.
+
+    Security:
+    - Hashes token before storing in DB
+    - Doesn't reveal if email exists (prevents enumeration)
+    - Rate limited to 5/hour per IP
+    """
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        # Always return success to prevent email enumeration
+        user = User.query.filter_by(email=email).first()
+
+        if user:
+            # Generate secure token
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+            # Store hashed token with 1-hour expiry
+            from api.app.services.password_service import password_service
+            user.reset_token = token_hash
+            user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+            db.session.commit()
+
+            # Send email with raw token (not hash)
+            email_service.send_password_reset(email, raw_token)
+
+            logger.info(f"Password reset requested for {email}")
+
+        # Always return same message (don't reveal email existence)
+        return jsonify({'message': 'If email exists, reset link sent'}), 200
+
+    except Exception as e:
+        logger.error(f"Forgot password error: {e}")
+        return jsonify({'error': 'An error occurred'}), 500
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("10 per hour")
+def reset_password():
+    """
+    Reset password using token.
+
+    Security:
+    - Validates token hash against DB
+    - Checks token expiry
+    - Validates password strength
+    - Clears token after successful reset
+    """
+    try:
+        from api.app.services.password_service import password_service
+
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        new_password = data.get('password', '')
+
+        if not token or not new_password:
+            return jsonify({'error': 'Token and password are required'}), 400
+
+        # Validate password strength
+        is_strong, message = password_service.validate_strength(new_password)
+        if not is_strong:
+            return jsonify({'error': message}), 400
+
+        # Hash the incoming token to compare with stored hash
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        # Find user by hashed token
+        user = User.query.filter_by(reset_token=token_hash).first()
+
+        if not user:
+            return jsonify({'error': 'Invalid or expired token'}), 400
+
+        # Check expiry (timezone-aware comparison)
+        if user.reset_token_expires is None:
+            return jsonify({'error': 'Invalid token'}), 400
+
+        now = datetime.now(timezone.utc)
+        expires = user.reset_token_expires
+        # Ensure expiry is timezone-aware for comparison
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+
+        if expires < now:
+            return jsonify({'error': 'Token expired'}), 400
+
+        # Update password
+        user.password_hash = password_service.hash_password(new_password)
+        user.reset_token = None
+        user.reset_token_expires = None
+        db.session.commit()
+
+        logger.info(f"Password reset successful for {user.email}")
+        return jsonify({'message': 'Password reset successful'}), 200
+
+    except Exception as e:
+        logger.error(f"Reset password error: {e}")
+        return jsonify({'error': 'An error occurred'}), 500
 
 
 # Initialize extensions correctly from shared instances

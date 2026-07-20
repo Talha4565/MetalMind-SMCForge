@@ -1,0 +1,22 @@
+{
+  "source": "mt5",
+  "updated_at": "2026-07-20T10:01:13.491576",
+  "prices": {
+    "gold": {
+      "symbol": "XAUUSD",
+      "bid": 4020.83,
+      "ask": 4020.95,
+      "price": 4020.89,
+      "spread": 12.0,
+      "timestamp": "2026-07-20T10:01:13.490922"
+    },
+    "silver": {
+      "symbol": "XAGUSD",
+      "bid": 56.905,
+      "ask": 56.936,
+      "price": 56.920500000000004,
+      "spread": 31.0,
+      "timestamp": "2026-07-20T10:01:13.491542"
+    }
+  }
+}

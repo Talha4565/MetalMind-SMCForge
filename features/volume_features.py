@@ -209,6 +209,103 @@ def add_all_volume_features(df: pd.DataFrame, windows: List[int] = [4, 16, 96]) 
     # Session flags
     df = add_session_flags(df)
     
+    # Add missing features expected by the trained model
+    df = add_model_required_features(df)
+    
+    return df
+
+
+def add_model_required_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add features required by the trained XGBoost model.
+    These include CVD variants, ADX, ATR, and trend features.
+    
+    Args:
+        df: DataFrame with OHLC columns
+    
+    Returns:
+        DataFrame with additional features added
+    """
+    df = df.copy()
+    
+    # === CVD Variants for specific timeframes ===
+    # cvd_15m: CVD using 15m data (1 bar = 15min for 15m timeframe)
+    # Since we're on 15m data, 1 bar = 15m, so use rolling(1) for "current" CVD
+    signed_volume = np.where(df['close'] > df['open'], df['volume'], -df['volume'])
+    
+    # cvd_15m: Use window=4 (1 hour = 4 x 15min bars)
+    df['cvd_15m'] = pd.Series(signed_volume, index=df.index).rolling(4).sum()
+    df['cvd_15m_slope'] = df['cvd_15m'].diff(4)  # Slope over 1 hour
+    
+    # cvd_30m: Use window=8 (2 hours = 8 x 15min bars)
+    df['cvd_30m'] = pd.Series(signed_volume, index=df.index).rolling(8).sum()
+    df['cvd_30m_slope'] = df['cvd_30m'].diff(8)  # Slope over 2 hours
+    
+    # === ADX (Average Directional Index) ===
+    # ADX measures trend strength (0-100)
+    period = 14
+    high = df['high']
+    low = df['low']
+    close = df['close']
+    
+    # True Range
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    
+    # Directional Movement
+    up_move = high - high.shift(1)
+    down_move = low.shift(1) - low
+    
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
+    
+    # Smoothed averages
+    atr_smooth = pd.Series(tr, index=df.index).rolling(period).mean()
+    plus_di = 100 * pd.Series(plus_dm, index=df.index).rolling(period).mean() / atr_smooth
+    minus_di = 100 * pd.Series(minus_dm, index=df.index).rolling(period).mean() / atr_smooth
+    
+    # ADX
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+    df['adx_14'] = dx.rolling(period).mean()
+    df['adx_trending'] = (df['adx_14'] > 25).astype(int)  # 1 if trending
+    
+    # === ATR (Average True Range) ===
+    df['atr_14'] = tr.rolling(period).mean()
+    
+    # === Trend Features ===
+    # EMA 20 and EMA 50
+    ema_20 = close.ewm(span=20, adjust=False).mean()
+    ema_50 = close.ewm(span=50, adjust=False).mean()
+    
+    # trend_ema_cross: 1 if EMA20 > EMA50 (bullish), 0 otherwise
+    df['trend_ema_cross'] = (ema_20 > ema_50).astype(int)
+    
+    # trend_price_vs_ema: Distance from price to EMA20 (normalized)
+    df['trend_price_vs_ema'] = (close - ema_20) / ema_20
+    
+    # trend_adx: ADX value (same as adx_14 but named for model compatibility)
+    df['trend_adx'] = df['adx_14']
+    
+    # trend_strength: Combined trend strength metric
+    # Positive = bullish, Negative = bearish, magnitude = strength
+    df['trend_strength'] = df['trend_ema_cross'] * 2 - 1  # +1 or -1
+    df['trend_strength'] = df['trend_strength'] * (df['adx_14'] / 100)  # Scale by ADX
+    
+    # Fill NaN values with 0
+    df['cvd_15m'].fillna(0, inplace=True)
+    df['cvd_15m_slope'].fillna(0, inplace=True)
+    df['cvd_30m'].fillna(0, inplace=True)
+    df['cvd_30m_slope'].fillna(0, inplace=True)
+    df['adx_14'].fillna(0, inplace=True)
+    df['adx_trending'].fillna(0, inplace=True)
+    df['atr_14'].fillna(0, inplace=True)
+    df['trend_ema_cross'].fillna(0, inplace=True)
+    df['trend_price_vs_ema'].fillna(0, inplace=True)
+    df['trend_adx'].fillna(0, inplace=True)
+    df['trend_strength'].fillna(0, inplace=True)
+    
     return df
 
 

@@ -35,6 +35,10 @@ class User(db.Model):
     # 2FA
     totp_secret = db.Column(db.String(32), nullable=True)
     totp_enabled = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Password Reset
+    reset_token = db.Column(db.String(128), nullable=True)  # sha256 hash
+    reset_token_expires = db.Column(db.DateTime(timezone=True), nullable=True)
     
     # Account status
     is_active = db.Column(db.Boolean, default=True, nullable=False)

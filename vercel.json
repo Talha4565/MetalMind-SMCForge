@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd frontend-next && npm install && npm run build",
+  "outputDirectory": "frontend-next/.next",
+  "framework": "nextjs",
+  "installCommand": "cd frontend-next && npm install",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "@api-url",
+    "NEXT_PUBLIC_SOCKET_URL": "@api-url",
+    "NEXTAUTH_SECRET": "@nextauth-secret",
+    "NEXTAUTH_URL": "@nextauth-url"
+  }
+}

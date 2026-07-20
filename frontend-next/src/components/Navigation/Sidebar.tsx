@@ -3,16 +3,19 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ShieldAlert, User, BarChart3, Activity, Eye, Menu, X } from 'lucide-react'
+import { Home, ShieldAlert, User, BarChart3, Activity, Eye, Menu, X, ScrollText, Cpu } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',           label: 'OVERVIEW',  short: 'OVR', icon: Home      },
+  { href: '/dashboard/gold',   label: 'GOLD',   short: 'XAU', icon: Home },
+  { href: '/dashboard/silver', label: 'SILVER', short: 'XAG', icon: Home },
   { href: '/dashboard/watchlist', label: 'WATCHLIST', short: 'WCH', icon: Eye       },
+  { href: '/dashboard/trade-log', label: 'TRADE LOG', short: 'LOG', icon: ScrollText },
   { href: '/backtest',            label: 'BACKTEST',  short: 'BKT', icon: BarChart3 },
   { href: '/dashboard/risk',      label: 'RISK',      short: 'RSK', icon: ShieldAlert },
   { href: '/dashboard/pipeline',  label: 'PIPELINE',  short: 'PIP', icon: Activity  },
+  { href: '/dashboard/orchestrator', label: 'ORCHESTRATOR', short: 'ORC', icon: Cpu      },
   { href: '/dashboard/profile',   label: 'PROFILE',   short: 'PRF', icon: User      },
 ]
 
@@ -23,7 +26,7 @@ export default function Sidebar() {
   const pathname = usePathname()
 
   const resolvedItems = NAV_ITEMS.map((item) => {
-    const needsAuth = item.href !== '/dashboard' && item.href !== '/dashboard/risk'
+    const needsAuth = item.href !== '/dashboard/gold' && item.href !== '/dashboard/silver' && item.href !== '/dashboard/risk'
     return {
       ...item,
       href: needsAuth && !isAuthenticated ? '/auth/login' : item.href,
@@ -40,6 +43,8 @@ export default function Sidebar() {
         </div>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={mobileOpen}
           className="p-1.5 text-terminal-label hover:text-terminal-value transition-colors"
         >
           {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -53,13 +58,15 @@ export default function Sidebar() {
           <aside className="relative h-full w-56 bg-sidebar border-r border-terminal-rule flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-terminal-rule">
               <div className="flex items-center gap-2">
-                <span className="text-terminal-hold font-mono text-sm font-black tracking-widest">MM</span>
-                <div>
-                  <p className="text-[10px] font-bold text-sidebar-foreground font-mono tracking-widest">METALMIND</p>
-                  <p className="text-[8px] text-terminal-label font-mono tracking-[0.25em]">SMCFORGE v1</p>
-                </div>
+                <Link href="/dashboard/gold" className="flex items-center gap-2">
+                  <span className="text-terminal-hold font-mono text-sm font-black tracking-widest">MM</span>
+                  <div>
+                    <p className="text-[10px] font-bold text-sidebar-foreground font-mono tracking-widest">METALMIND</p>
+                    <p className="text-[8px] text-terminal-label font-mono tracking-[0.25em]">SMCFORGE v1</p>
+                  </div>
+                </Link>
               </div>
-              <button onClick={() => setMobileOpen(false)} className="text-terminal-label hover:text-terminal-value">
+              <button onClick={() => setMobileOpen(false)} aria-label="Close navigation menu" className="text-terminal-label hover:text-terminal-value">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -92,7 +99,7 @@ export default function Sidebar() {
       <aside className="hidden sm:flex flex-col w-48 bg-sidebar border-r border-terminal-rule sticky top-0 h-screen shrink-0 z-30">
         {/* Brand */}
         <div className="px-4 py-4 border-b border-terminal-rule">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <Link href="/dashboard/gold" className="flex items-center gap-2.5 group">
             <div className="w-7 h-7 bg-terminal-hold flex items-center justify-center shrink-0">
               <span className="text-black text-[11px] font-black font-mono">MM</span>
             </div>

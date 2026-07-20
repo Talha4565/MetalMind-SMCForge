@@ -25,7 +25,6 @@ export function useBacktestHistory() {
     queryKey: ['backtest-results'],
     queryFn: () => apiClient.getBacktestResults(),
     staleTime: 5 * 60 * 1000,
-    enabled: typeof window !== 'undefined' && !!localStorage.getItem('auth_token'),
     retry: false,
   });
 }

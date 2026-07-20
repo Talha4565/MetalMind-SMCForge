@@ -1,15 +1,16 @@
 """
-Automated pipeline: Fetch live data → Append to CSVs → Retrain model.
+Automated pipeline: Fetch live data via MT5 + Append to CSVs + Retrain model.
 
 Usage:
-    python run_pipeline.py --mode backfill          # Fill gap from Sept 2024 to today
-    python run_pipeline.py --mode update            # Fetch latest candles only
+    python run_pipeline.py --mode update            # Fetch latest candles via MT5
     python run_pipeline.py --mode retrain           # Retrain model on full data
-    python run_pipeline.py --mode full              # Backfill + Retrain
+    python run_pipeline.py --mode full              # Update + Retrain
     python run_pipeline.py --mode schedule          # Run continuously (15min update + 24h retrain)
     python run_pipeline.py --mode status            # Show pipeline status
     python run_pipeline.py --mode freshness         # Check data freshness
     python run_pipeline.py --mode backups           # List model backups
+
+Requires MetaTrader 5 terminal running on the host machine.
 """
 
 import sys
@@ -21,8 +22,6 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from etl.extractors.yfinance_extractor import YFinanceExtractor
-from etl.loaders.csv_append_loader import CSVAppendLoader
 from etl.orchestrator import PipelineOrchestrator
 from config.settings import GOLD_DATASET_DIR, SILVER_DATASET_DIR, REPORTS_DIR
 
@@ -37,34 +36,109 @@ orchestrator = PipelineOrchestrator()
 
 
 def run_fetch_and_append(asset: str, intervals: list = None):
-    """Fetch live data and append to CSVs."""
+    """Fetch live data and append to CSVs using MT5.
+    
+    Requires MetaTrader 5 terminal running on the host.
+    Called by orchestrator.run_update() and etl_monitor.py.
+    
+    Returns:
+        dict with 'success', 'records_added', 'error' keys
+    """
     if intervals is None:
-        intervals = ['5m', '15m', '30m', '1h']
+        intervals = ['15m']  # Default to 15m for quick updates
     
-    logger.info(f"=" * 60)
+    logger.info("=" * 60)
     logger.info(f"FETCH & APPEND: {asset.upper()}")
-    logger.info(f"=" * 60)
+    logger.info("=" * 60)
     
-    # Extract
-    extractor = YFinanceExtractor(asset=asset, intervals=intervals)
-    data = extractor.extract()
+    result = {
+        'success': False,
+        'asset': asset,
+        'records_added': 0,
+        'error': None,
+        'timestamp': datetime.now().isoformat(),
+    }
     
-    if not data:
-        logger.error(f"No data fetched for {asset}")
-        return
+    try:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            error_msg = f"MT5 initialize failed: {mt5.last_error()}"
+            logger.error(error_msg)
+            result['error'] = error_msg
+            return result
+        
+        logger.info("MT5 connected successfully")
+        mt5.shutdown()
+        
+        # Run the MT5 data update script
+        import subprocess
+        cmd = [sys.executable, 'scripts/mt5_data_update.py', '--intervals'] + intervals
+        if asset:
+            cmd.extend(['--asset', asset])
+        
+        proc = subprocess.run(
+            cmd,
+            capture_output=True, text=True, 
+            cwd=str(Path(__file__).parent),
+            timeout=120  # 2 minute timeout
+        )
+        
+        if proc.returncode == 0:
+            logger.info(f"✓ {asset.upper()} data updated via MT5")
+            result['success'] = True
+            # Parse output to get record count
+            for line in proc.stdout.split('\n'):
+                if 'new' in line and 'dupes' in line:
+                    try:
+                        # Format: "  Gold_15m_Candlestick.csv: +100 new, 50 dupes, total 55700 rows"
+                        parts = line.split('+')
+                        if len(parts) > 1:
+                            result['records_added'] = int(parts[1].split('new')[0].strip())
+                    except:
+                        pass
+        else:
+            error_msg = f"MT5 update failed: {proc.stderr}"
+            logger.error(error_msg)
+            result['error'] = error_msg
+        
+    except ImportError:
+        logger.warning("MetaTrader5 not installed — falling back to yfinance")
+        try:
+            from etl.extractors.yfinance_extractor import YFinanceExtractor
+            from etl.loaders.csv_append_loader import CSVAppendLoader
+            from config.settings import GOLD_DATASET_DIR, SILVER_DATASET_DIR
+
+            dataset_dir = str(GOLD_DATASET_DIR if asset == 'gold' else SILVER_DATASET_DIR)
+            yf_extractor = YFinanceExtractor(asset=asset, intervals=intervals)
+            data_dict = yf_extractor.extract()  # Returns dict[interval, DataFrame]
+            loader = CSVAppendLoader(output_dir=dataset_dir, asset=asset)
+
+            if data_dict:
+                loader.run(data_dict)
+                for interval, df in data_dict.items():
+                    if df is not None and not df.empty:
+                        result['records_added'] += len(df)
+                        logger.info(f"  ✓ {asset} {interval}: +{len(df)} rows via yfinance")
+
+            if result['records_added'] > 0:
+                result['success'] = True
+                logger.info(f"✓ {asset.upper()} updated via yfinance: +{result['records_added']} rows total")
+            else:
+                result['error'] = "yfinance returned no new data for any interval"
+                logger.warning(result['error'])
+        except Exception as yf_err:
+            result['error'] = f"yfinance fallback also failed: {yf_err}"
+            logger.error(result['error'])
+    except subprocess.TimeoutExpired:
+        error_msg = "MT5 update timed out after 120 seconds"
+        logger.error(error_msg)
+        result['error'] = error_msg
+    except Exception as e:
+        error_msg = f"MT5 error: {e}"
+        logger.error(error_msg)
+        result['error'] = error_msg
     
-    # Load (append to CSVs)
-    output_dir = GOLD_DATASET_DIR if asset == 'gold' else SILVER_DATASET_DIR
-    loader = CSVAppendLoader(
-        output_dir=str(output_dir),
-        asset=asset
-    )
-    success = loader.run(data)
-    
-    if success:
-        logger.info(f"✓ {asset.upper()} data appended successfully")
-    else:
-        logger.error(f"✗ Failed to append {asset.upper()} data")
+    return result
 
 
 def run_backfill(asset: str):

@@ -1,12 +1,13 @@
-﻿import Link from 'next/link';
+'use client';
+
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
+import { Suspense } from 'react';
 
-interface VerifySuccessPageProps {
-  searchParams?: { email?: string };
-}
-
-export default function VerifySuccessPage({ searchParams }: VerifySuccessPageProps) {
-  const email = searchParams?.email || '';
+function VerifySuccessContent() {
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') || '';
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -40,5 +41,17 @@ export default function VerifySuccessPage({ searchParams }: VerifySuccessPagePro
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifySuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <VerifySuccessContent />
+    </Suspense>
   );
 }

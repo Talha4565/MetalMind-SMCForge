@@ -3,15 +3,16 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from '@/components/ui/form';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
@@ -36,6 +37,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormProps) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -90,7 +92,7 @@ export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormPro
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -118,7 +120,16 @@ export function LoginForm({ onSubmit, isLoading, showOtp = false }: LoginFormPro
                     className="h-11 bg-input/30 border-border text-foreground placeholder:text-muted-foreground focus:border-ring focus:ring-ring/20 transition-all"
                   />
                 </FormControl>
+              <div className="flex items-center justify-between mt-1">
                 <FormMessage className="text-xs" />
+                <button
+                  type="button"
+                  className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors ml-auto"
+                  onClick={() => router.push('/auth/forgot-password')}
+                >
+                  Forgot password?
+                </button>
+              </div>
               </FormItem>
             )}
           />

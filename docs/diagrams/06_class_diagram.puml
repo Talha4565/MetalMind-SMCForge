@@ -1,0 +1,130 @@
+@startuml Class_Diagram
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam classBorderColor #1A1D24
+skinparam classBackgroundColor #F8F9FA
+skinparam defaultFontSize 11
+left to right direction
+
+class User {
+  + id : Integer <<PK>>
+  + email : String <<UNIQUE>>
+  + name : String
+  + password_hash : String
+  + is_verified : Boolean
+  + totp_enabled : Boolean
+  + is_active : Boolean
+  + is_admin : Boolean
+  + created_at : DateTime
+  + last_login : DateTime
+  --
+  + register(email, password) : User
+  + authenticate(password) : Boolean
+  + deactivate() : void
+  + to_dict() : Dict
+}
+
+class WatchlistItem {
+  + id : Integer <<PK>>
+  + symbol : String
+  + display_name : String
+  + notifications_enabled : Boolean
+  + alert_threshold : Float
+  + order : Integer
+  + created_at : DateTime
+  --
+  + to_dict() : Dict
+}
+
+class Forecast {
+  + signal_id : String
+  + asset : String
+  + signal : Integer
+  + probability : Float
+  + confidence : Float
+  + price : Float
+  + tp_price : Float
+  + sl_price : Float
+  + shap_values : JSON
+  + timestamp : DateTime
+  + actual_outcome : String
+  + actual_pnl : Float
+  --
+  + check_outcome(current_price) : String
+}
+
+class Backtest {
+  + id : Integer <<PK>>
+  + asset : String
+  + strategy : String
+  + start_date : Date
+  + end_date : Date
+  + initial_capital : Float
+  + win_rate : Float
+  + profit_factor : Float
+  + sharpe_ratio : Float
+  + sortino_ratio : Float
+  + calmar_ratio : Float
+  + max_drawdown : Float
+  + net_profit : Float
+  + total_trades : Integer
+  + equity_curve : JSON
+  + created_at : DateTime
+  --
+  + run() : BacktestResult
+  + get_metrics() : Dict
+  + export_csv() : Blob
+}
+
+class OHLCV_Data {
+  + date : Date
+  + time : Time
+  + open : Float
+  + high : Float
+  + low : Float
+  + close : Float
+  + volume : Integer
+  + timeframe : String
+}
+
+class Commodity <<conceptual>> {
+  + symbol : String
+  + name : String
+  + tp_pct : Float
+  + sl_pct : Float
+}
+
+class Session {
+  + id : Integer <<PK>>
+  + session_id : String <<UNIQUE>>
+  + ip_address : String
+  + user_agent : String
+  + created_at : DateTime
+  + expires_at : DateTime
+}
+
+class UserSettings {
+  + theme : String
+  + default_timeframe : String
+  + default_asset : String
+  + notifications_enabled : Boolean
+  + avatar_url : String
+}
+
+User "1" -- "N" Session
+User "1" -- "N" WatchlistItem
+User "1" -- "1" UserSettings
+User "1" -- "N" Forecast
+User "1" -- "N" Backtest
+
+WatchlistItem "N" -- "1" Commodity
+
+Forecast "N" -- "1" Commodity
+Forecast "N" -- "1" User
+
+Backtest "N" -- "1" Commodity
+Backtest "N" -- "1" User
+
+Commodity "1" -- "N" OHLCV_Data
+
+@enduml

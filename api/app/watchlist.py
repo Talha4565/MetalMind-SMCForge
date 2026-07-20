@@ -10,6 +10,7 @@ import logging
 
 from api.app.database import db, WatchlistItem, User
 from config.settings import ASSETS
+from api.app.extensions import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ def token_required(f):
 
 @watchlist_bp.route('', methods=['GET'])
 @token_required
+@limiter.limit("60 per minute")
 def get_watchlist(current_user):
     """
     Get user's watchlist.
@@ -53,6 +55,7 @@ def get_watchlist(current_user):
 
 @watchlist_bp.route('', methods=['POST'])
 @token_required
+@limiter.limit("30 per minute")
 def add_to_watchlist(current_user):
     """
     Add asset to watchlist.
@@ -175,6 +178,7 @@ def update_watchlist_item(current_user, item_id):
 
 @watchlist_bp.route('/<int:item_id>', methods=['DELETE'])
 @token_required
+@limiter.limit("30 per minute")
 def remove_from_watchlist(current_user, item_id):
     """
     Remove asset from watchlist.
@@ -253,6 +257,7 @@ def reorder_watchlist(current_user):
 
 
 @watchlist_bp.route('/symbols', methods=['GET'])
+@limiter.limit("60 per minute")
 def get_available_symbols():
     """
     Get list of available symbols that can be added to watchlist.

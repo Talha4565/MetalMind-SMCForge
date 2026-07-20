@@ -17,8 +17,13 @@ export interface User {
 export interface Profile {
   id: string;
   email: string;
+  name: string;
   username: string;
+  is_active: boolean;
+  is_verified: boolean;
   totp_enabled: boolean;
+  created_at?: string;
+  last_login?: string;
   settings?: {
     avatar_url?: string;
     notifications?: boolean;
@@ -69,8 +74,11 @@ export interface PredictionItem {
   high?: number;
   low?: number;
   close?: number;
+  tp_price?: number;
+  sl_price?: number;
   timestamp: string;
   shap_values: SHAPValue[];
+  trade_active?: boolean;
 }
 
 export interface PredictionResponse {
@@ -106,11 +114,15 @@ export interface Trade {
 }
 
 export interface BacktestResponse {
+  asset?: string;
   win_rate: number;
   profit_factor: number;
   max_drawdown: number;
   total_trades: number;
   net_profit: number;
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  calmar_ratio: number;
   trades: Trade[];
 }
 
@@ -138,6 +150,40 @@ export interface WatchlistResponse {
 
 export interface SymbolsResponse {
   symbols: WatchlistSymbol[];
+}
+
+// --- Prediction History Types ---
+
+export interface PredictionLogItem {
+  timestamp: string;
+  asset: string;
+  signal: number;
+  signal_text: string;
+  confidence: number;
+  price: number;
+  tp_price: number | null;
+  sl_price: number | null;
+  shap_values: SHAPValue[];
+  model_version: string;
+  actual_outcome: string | null;
+  actual_pnl: number | null;
+  outcome_checked_at: string | null;
+}
+
+export interface PredictionHistorySummary {
+  total_predictions: number;
+  buy_signals: number;
+  sell_signals: number;
+  hold_signals: number;
+  evaluated: number;
+  wins: number;
+  losses: number;
+  avg_confidence: number;
+}
+
+export interface PredictionHistoryResponse {
+  predictions: PredictionLogItem[];
+  summary: PredictionHistorySummary;
 }
 
 // --- Error Types ---

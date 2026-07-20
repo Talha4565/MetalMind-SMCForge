@@ -6,14 +6,12 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from etl.alerts import EmailAlertService
-
 
 class TestEmailAlertService:
     """Test email alert service."""
 
-    def test_init_without_env(self):
-        service = EmailAlertService(
+    def test_init_without_env(self, email_alert_service):
+        service = email_alert_service(
             smtp_host='smtp.gmail.com',
             smtp_port=587,
             sender_email='test@test.com',
@@ -22,8 +20,8 @@ class TestEmailAlertService:
         )
         assert service.enabled is True
 
-    def test_init_without_credentials(self):
-        service = EmailAlertService(
+    def test_init_without_credentials(self, email_alert_service):
+        service = email_alert_service(
             smtp_host='',
             sender_email='',
             sender_password='',
@@ -31,8 +29,8 @@ class TestEmailAlertService:
         )
         assert service.enabled is False
 
-    def test_should_alert_buy_above_threshold(self):
-        service = EmailAlertService(
+    def test_should_alert_buy_above_threshold(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com',
@@ -40,8 +38,8 @@ class TestEmailAlertService:
         )
         assert service.should_alert(signal=1, confidence=0.85) is True
 
-    def test_should_alert_sell_above_threshold(self):
-        service = EmailAlertService(
+    def test_should_alert_sell_above_threshold(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com',
@@ -49,8 +47,8 @@ class TestEmailAlertService:
         )
         assert service.should_alert(signal=-1, confidence=0.80) is True
 
-    def test_should_not_alert_below_threshold(self):
-        service = EmailAlertService(
+    def test_should_not_alert_below_threshold(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com',
@@ -58,8 +56,8 @@ class TestEmailAlertService:
         )
         assert service.should_alert(signal=1, confidence=0.60) is False
 
-    def test_should_not_alert_hold(self):
-        service = EmailAlertService(
+    def test_should_not_alert_hold(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com',
@@ -67,16 +65,16 @@ class TestEmailAlertService:
         )
         assert service.should_alert(signal=0, confidence=0.95) is False
 
-    def test_should_not_alert_when_disabled(self):
-        service = EmailAlertService(
+    def test_should_not_alert_when_disabled(self, email_alert_service):
+        service = email_alert_service(
             sender_email='',
             sender_password='',
             recipient_email=''
         )
         assert service.should_alert(signal=1, confidence=0.95) is False
 
-    def test_send_alert_disabled_returns_false(self):
-        service = EmailAlertService(
+    def test_send_alert_disabled_returns_false(self, email_alert_service):
+        service = email_alert_service(
             sender_email='',
             sender_password='',
             recipient_email=''
@@ -86,8 +84,8 @@ class TestEmailAlertService:
         )
         assert result is False
 
-    def test_send_alert_below_threshold_returns_false(self):
-        service = EmailAlertService(
+    def test_send_alert_below_threshold_returns_false(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com',
@@ -99,8 +97,8 @@ class TestEmailAlertService:
         assert result is False
 
     @patch('etl.alerts.smtplib.SMTP')
-    def test_send_alert_success(self, mock_smtp):
-        service = EmailAlertService(
+    def test_send_alert_success(self, mock_smtp, email_alert_service):
+        service = email_alert_service(
             smtp_host='smtp.gmail.com',
             smtp_port=587,
             sender_email='test@gmail.com',
@@ -122,8 +120,8 @@ class TestEmailAlertService:
         assert result is True
 
     @patch('etl.alerts.smtplib.SMTP')
-    def test_send_alert_with_shap_values(self, mock_smtp):
-        service = EmailAlertService(
+    def test_send_alert_with_shap_values(self, mock_smtp, email_alert_service):
+        service = email_alert_service(
             smtp_host='smtp.gmail.com',
             smtp_port=587,
             sender_email='test@gmail.com',
@@ -148,8 +146,8 @@ class TestEmailAlertService:
         assert result is True
 
     @patch('etl.alerts.smtplib.SMTP')
-    def test_send_alert_smtp_error_returns_false(self, mock_smtp):
-        service = EmailAlertService(
+    def test_send_alert_smtp_error_returns_false(self, mock_smtp, email_alert_service):
+        service = email_alert_service(
             smtp_host='smtp.gmail.com',
             smtp_port=587,
             sender_email='test@gmail.com',
@@ -165,8 +163,8 @@ class TestEmailAlertService:
         )
         assert result is False
 
-    def test_default_threshold(self):
-        service = EmailAlertService(
+    def test_default_threshold(self, email_alert_service):
+        service = email_alert_service(
             sender_email='test@test.com',
             sender_password='pass',
             recipient_email='rec@test.com'

@@ -1,0 +1,20 @@
+{
+  "asset": "silver",
+  "started_at": "2026-07-01T10:26:06.040546",
+  "status": "success",
+  "data_rows": 6819,
+  "train_rows": 4773,
+  "val_rows": 1023,
+  "test_rows": 1023,
+  "feature_count": 89,
+  "best_params": {
+    "max_depth": 4,
+    "lr": 0.017874988023715007,
+    "sub": 0.7069700731351664,
+    "col": 0.7858982804155428
+  },
+  "accuracy": 0.739980449657869,
+  "model_path": "models/processed/silver_model_enhanced.pkl",
+  "completed_at": "2026-07-01T10:29:50.860256",
+  "duration_seconds": 224.82
+}

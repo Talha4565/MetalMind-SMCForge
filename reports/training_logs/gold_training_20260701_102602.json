@@ -1,0 +1,20 @@
+{
+  "asset": "gold",
+  "started_at": "2026-07-01T10:24:42.798380",
+  "status": "success",
+  "data_rows": 6807,
+  "train_rows": 4764,
+  "val_rows": 1021,
+  "test_rows": 1022,
+  "feature_count": 89,
+  "best_params": {
+    "max_depth": 3,
+    "lr": 0.04986420670638732,
+    "sub": 0.6558072795515031,
+    "col": 0.6659641571634812
+  },
+  "accuracy": 0.7954990215264188,
+  "model_path": "models/enhanced_15m.pkl",
+  "completed_at": "2026-07-01T10:26:02.990090",
+  "duration_seconds": 80.19
+}

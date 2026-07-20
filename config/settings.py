@@ -30,7 +30,7 @@ ASSETS = {
         "name": "XAU/USD",
         "files": {
             "5m": GOLD_DATASET_DIR / "Gold_5m_Candlestick.csv",
-            "15m": GOLD_DATASET_DIR / "Gold_15m_Candlestick.csv",
+            "15m": GOLD_DATASET_DIR / "Gold_15m_Candlestick_4Y.csv",
             "30m": GOLD_DATASET_DIR / "Gold_30m_Candlestick.csv",
             "1h": GOLD_DATASET_DIR / "Gold_1h_Candlestick.csv"
         }

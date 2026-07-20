@@ -1,7 +1,7 @@
 """Flask API routes for ETL pipeline management."""
 
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required
+from api.app.auth import token_required
 import threading
 import logging
 
@@ -37,8 +37,8 @@ def get_scheduler():
 
 
 @etl_bp.route('/run', methods=['POST'])
-@jwt_required()
-def run_pipeline():
+@token_required
+def run_pipeline(_email=None):
     """
     Manually trigger ETL pipeline.
     
@@ -108,8 +108,8 @@ def run_pipeline():
 
 
 @etl_bp.route('/status', methods=['GET'])
-@jwt_required()
-def get_status():
+@token_required
+def get_status(_email=None):
     """
     Get ETL pipeline status.
     
@@ -136,8 +136,8 @@ def get_status():
 
 
 @etl_bp.route('/schedule', methods=['GET'])
-@jwt_required()
-def get_schedule():
+@token_required
+def get_schedule(_email=None):
     """Get scheduled ETL jobs."""
     try:
         sched = get_scheduler()
@@ -157,8 +157,8 @@ def get_schedule():
 
 
 @etl_bp.route('/schedule/start', methods=['POST'])
-@jwt_required()
-def start_scheduler():
+@token_required
+def start_scheduler(_email=None):
     """Start the ETL scheduler."""
     try:
         sched = get_scheduler()
@@ -179,8 +179,8 @@ def start_scheduler():
 
 
 @etl_bp.route('/schedule/stop', methods=['POST'])
-@jwt_required()
-def stop_scheduler():
+@token_required
+def stop_scheduler(_email=None):
     """Stop the ETL scheduler."""
     try:
         global scheduler
@@ -198,8 +198,8 @@ def stop_scheduler():
 
 
 @etl_bp.route('/metrics', methods=['GET'])
-@jwt_required()
-def get_metrics():
+@token_required
+def get_metrics(_email=None):
     """Get detailed ETL metrics."""
     try:
         sched = get_scheduler()

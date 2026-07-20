@@ -80,6 +80,7 @@ export default function TradingViewChart({ asset }: TradingViewChartProps) {
             className="w-full h-full border-0"
             scrolling="no"
             allowFullScreen
+            sandbox="allow-scripts allow-same-origin"
             title={`${sym.label} Chart`}
           />
         ) : (

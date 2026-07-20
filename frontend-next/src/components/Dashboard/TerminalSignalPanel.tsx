@@ -5,35 +5,7 @@ import { TrendingUp, TrendingDown, Minus, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useWebSocket } from '@/lib/hooks/useWebSocket';
-
-const SHAP_LABELS: Record<string, string> = {
-  htf_1h_dist_low: 'Dist. Recent Low',
-  htf_1h_dist_high: 'Dist. Recent High',
-  htf_1h_momentum: '1H Momentum',
-  htf_1h_atr: '1H Volatility',
-  premium_discount_position: 'Prem/Disc Zone',
-  distance_from_equilibrium: 'Fair Value Dist.',
-  VWAPd_4: 'VWAP Dev. S',
-  VWAPd_16: 'VWAP Dev. M',
-  VWAPd_96: 'VWAP Dev. L',
-  CVD_4: 'Order Flow S',
-  CVD_16: 'Order Flow M',
-  CVD_96: 'Order Flow L',
-  session_ny: 'NY Session',
-  session_london: 'London Session',
-  session_asia: 'Asia Session',
-  session_overlap: 'Session Overlap',
-  Ret_4: 'Return S',
-  Ret_16: 'Return M',
-  Ret_96: 'Return L',
-  Imbal_4: 'Imbalance S',
-  Imbal_16: 'Imbalance M',
-  Imbal_96: 'Imbalance L',
-  close: 'Last Close',
-  high: 'Session High',
-  low: 'Session Low',
-  volume: 'Volume',
-};
+import { SHAP_LABELS } from '@/lib/shap-labels';
 
 function label(raw: string) {
   return SHAP_LABELS[raw] ?? raw.replace(/_/g, ' ').toUpperCase().slice(0, 18);
@@ -77,8 +49,8 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
 
   const Icon = isBuy ? TrendingUp : isSell ? TrendingDown : Minus;
 
-  const shap = current.shap_values ?? [];
-  const maxAbs = Math.max(...shap.map(s => Math.abs(s.contribution)), 0.001);
+  const shap = Array.isArray(current.shap_values) ? current.shap_values : [];
+  const maxAbs = shap.length > 0 ? Math.max(...shap.map(s => Math.abs(s.contribution)), 0.001) : 0.001;
   const topShap = [...shap].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).slice(0, 6);
 
   const displayPrice = livePrice ?? current.price;
@@ -116,6 +88,34 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
           </p>
         </div>
       </div>
+
+      {/* TP/SL row — only show when signal is BUY or SELL */}
+      {signalLabel !== 'HOLD' && (current.tp_price != null || current.sl_price != null) && (
+        <div className="grid grid-cols-2 gap-px bg-terminal-rule">
+          <div className="bg-terminal-panel px-3 py-2">
+            <p className="text-[8px] font-mono text-terminal-label tracking-widest mb-1">TAKE PROFIT</p>
+            <p className="text-[14px] font-mono font-black text-terminal-buy tabular-nums">
+              ${current.tp_price != null ? current.tp_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </p>
+          </div>
+          <div className="bg-terminal-panel px-3 py-2">
+            <p className="text-[8px] font-mono text-terminal-label tracking-widest mb-1">STOP LOSS</p>
+            <p className="text-[14px] font-mono font-black text-terminal-sell tabular-nums">
+              ${current.sl_price != null ? current.sl_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Active trade indicator */}
+      {(current as any).trade_active && (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border border-terminal-hold/40 bg-terminal-hold/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-terminal-hold animate-pulse" />
+          <span className="text-[8px] font-mono font-bold text-terminal-hold tracking-widest">
+            TRADE ACTIVE — TP/SL LOCKED
+          </span>
+        </div>
+      )}
 
       {/* Connection status */}
       <div className="flex items-center gap-1.5 px-1">

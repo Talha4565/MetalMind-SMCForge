@@ -1,0 +1,434 @@
+{
+  "Gamma-65": {
+    "folds": [
+      {
+        "fold": 1,
+        "train_start": "2025-10-09",
+        "train_end": "2025-12-09",
+        "test_start": "2025-12-09",
+        "test_end": "2026-01-09",
+        "train_rows": 4263,
+        "test_rows": 2099,
+        "n_trades": 5,
+        "win_rate": 0.8,
+        "avg_win": 24.710799788143518,
+        "avg_loss": -2.6924274831995874,
+        "profit_factor": 9.177888705391634,
+        "total_return_usd": 96.15077166937448,
+        "total_return_pct": 1.9230154333874896,
+        "max_drawdown_usd": -2.6924274831995874,
+        "sharpe_ratio": 21.19736751788613,
+        "sortino_ratio": NaN,
+        "tp_hits": 4,
+        "sl_hits": 0,
+        "avg_bars_held": 8.2
+      },
+      {
+        "fold": 2,
+        "train_start": "2025-11-09",
+        "train_end": "2026-01-09",
+        "test_start": "2026-01-09",
+        "test_end": "2026-02-09",
+        "train_rows": 4211,
+        "test_rows": 2096,
+        "n_trades": 8,
+        "win_rate": 0.625,
+        "avg_win": 26.627477851165327,
+        "avg_loss": -34.155347611428205,
+        "profit_factor": 0.7795990880870411,
+        "total_return_usd": 30.671346421542,
+        "total_return_pct": 0.61342692843084,
+        "max_drawdown_usd": -52.401353730856435,
+        "sharpe_ratio": 1.7217686301526567,
+        "sortino_ratio": 3.678043345082631,
+        "tp_hits": 1,
+        "sl_hits": 3,
+        "avg_bars_held": 15.875
+      },
+      {
+        "fold": 3,
+        "train_start": "2025-12-09",
+        "train_end": "2026-02-09",
+        "test_start": "2026-02-09",
+        "test_end": "2026-03-09",
+        "train_rows": 4195,
+        "test_rows": 1984,
+        "n_trades": 90,
+        "win_rate": 0.5666666666666667,
+        "avg_win": 36.15437055277769,
+        "avg_loss": -20.37666283277499,
+        "profit_factor": 1.7743028311105455,
+        "total_return_usd": 1049.1830477134376,
+        "total_return_pct": 20.983660954268753,
+        "max_drawdown_usd": -221.89456731005436,
+        "sharpe_ratio": 5.7437504518864735,
+        "sortino_ratio": 19.21808713254394,
+        "tp_hits": 39,
+        "sl_hits": 34,
+        "avg_bars_held": 10.122222222222222
+      },
+      {
+        "fold": 4,
+        "train_start": "2026-01-09",
+        "train_end": "2026-03-09",
+        "test_start": "2026-03-09",
+        "test_end": "2026-04-09",
+        "train_rows": 4080,
+        "test_rows": 2176,
+        "n_trades": 59,
+        "win_rate": 0.5254237288135594,
+        "avg_win": 49.77640772558739,
+        "avg_loss": -35.860281396226426,
+        "profit_factor": 1.3880651737112513,
+        "total_return_usd": 538.980760398869,
+        "total_return_pct": 10.77961520797738,
+        "max_drawdown_usd": -569.6116701202295,
+        "sharpe_ratio": 2.9420089669225695,
+        "sortino_ratio": 7.300091747563858,
+        "tp_hits": 24,
+        "sl_hits": 24,
+        "avg_bars_held": 10.322033898305085
+      }
+    ],
+    "aggregated": {
+      "win_rate": {
+        "mean": 0.6292725988700565,
+        "std": 0.1047260606973686
+      },
+      "profit_factor": {
+        "mean": 3.279963949575118,
+        "std": 3.423581357570198
+      },
+      "sharpe_ratio": {
+        "mean": 7.901223891711957,
+        "std": 7.813795604110578
+      },
+      "total_return_usd": {
+        "mean": 428.7464815508058,
+        "std": 408.098287274201
+      },
+      "n_trades": {
+        "mean": 40.5,
+        "std": 35.738634557016866
+      }
+    },
+    "single": {
+      "n_trades": 270,
+      "win_rate": 0.4111111111111111,
+      "avg_win": 29.491800396829085,
+      "avg_loss": -16.424476258186434,
+      "profit_factor": 1.7956006592374303,
+      "total_return_usd": 662.0981189963848,
+      "total_return_pct": 13.241962379927696,
+      "max_drawdown_usd": -427.0045269928907,
+      "sharpe_ratio": 1.570852768997631,
+      "sortino_ratio": 7.122425767622258,
+      "tp_hits": 81,
+      "sl_hits": 146,
+      "avg_bars_held": 9.785185185185185
+    },
+    "forward": {
+      "n_trades": 217,
+      "win_rate": 0.576036866359447,
+      "avg_win": 29.0100388453402,
+      "avg_loss": -16.33962300035257,
+      "profit_factor": 1.7754411374555112,
+      "total_return_usd": 2123.00953963509,
+      "total_return_pct": 42.460190792701795,
+      "max_drawdown_usd": -174.56684987553672,
+      "sharpe_ratio": 6.221315791963067,
+      "sortino_ratio": 29.581843660744102,
+      "tp_hits": 93,
+      "sl_hits": 84,
+      "avg_bars_held": 10.599078341013826
+    }
+  },
+  "Gamma-70": {
+    "folds": [
+      {
+        "fold": 1,
+        "train_start": "2025-10-09",
+        "train_end": "2025-12-09",
+        "test_start": "2025-12-09",
+        "test_end": "2026-01-09",
+        "train_rows": 4263,
+        "test_rows": 2099,
+        "n_trades": 2,
+        "win_rate": 1.0,
+        "avg_win": 25.527448650686082,
+        "avg_loss": 0.0,
+        "profit_factor": 0,
+        "total_return_usd": 51.054897301372165,
+        "total_return_pct": 1.0210979460274434,
+        "max_drawdown_usd": 0.0,
+        "sharpe_ratio": 79.60031401259441,
+        "sortino_ratio": 0,
+        "tp_hits": 2,
+        "sl_hits": 0,
+        "avg_bars_held": 3.5
+      },
+      {
+        "fold": 2,
+        "train_start": "2025-11-09",
+        "train_end": "2026-01-09",
+        "test_start": "2026-01-09",
+        "test_end": "2026-02-09",
+        "train_rows": 4211,
+        "test_rows": 2096,
+        "n_trades": 5,
+        "win_rate": 0.6,
+        "avg_win": 30.06662580514264,
+        "avg_loss": -34.894107557656596,
+        "profit_factor": 0.8616533824647223,
+        "total_return_usd": 20.411662300114727,
+        "total_return_pct": 0.40823324600229455,
+        "max_drawdown_usd": -51.3918272567992,
+        "sharpe_ratio": 1.5731965863701995,
+        "sortino_ratio": 2.7776001198103253,
+        "tp_hits": 1,
+        "sl_hits": 2,
+        "avg_bars_held": 14.4
+      },
+      {
+        "fold": 3,
+        "train_start": "2025-12-09",
+        "train_end": "2026-02-09",
+        "test_start": "2026-02-09",
+        "test_end": "2026-03-09",
+        "train_rows": 4195,
+        "test_rows": 1984,
+        "n_trades": 64,
+        "win_rate": 0.5625,
+        "avg_win": 35.487170500485895,
+        "avg_loss": -21.119217509183546,
+        "profit_factor": 1.6803260104241335,
+        "total_return_usd": 686.2000477603533,
+        "total_return_pct": 13.724000955207066,
+        "max_drawdown_usd": -167.4501557958854,
+        "sharpe_ratio": 5.320982210588298,
+        "sortino_ratio": 19.049242274825595,
+        "tp_hits": 28,
+        "sl_hits": 26,
+        "avg_bars_held": 9.21875
+      },
+      {
+        "fold": 4,
+        "train_start": "2026-01-09",
+        "train_end": "2026-03-09",
+        "test_start": "2026-03-09",
+        "test_end": "2026-04-09",
+        "train_rows": 4080,
+        "test_rows": 2176,
+        "n_trades": 37,
+        "win_rate": 0.4594594594594595,
+        "avg_win": 49.44393258723073,
+        "avg_loss": -35.216928520225636,
+        "profit_factor": 1.4039819673323952,
+        "total_return_usd": 136.20828357840972,
+        "total_return_pct": 2.7241656715681946,
+        "max_drawdown_usd": -495.5458265557726,
+        "sharpe_ratio": 1.1839548838716023,
+        "sortino_ratio": 2.7322021556649063,
+        "tp_hits": 11,
+        "sl_hits": 16,
+        "avg_bars_held": 12.378378378378379
+      }
+    ],
+    "aggregated": {
+      "win_rate": {
+        "mean": 0.6554898648648649,
+        "std": 0.20545157162001915
+      },
+      "profit_factor": {
+        "mean": 0.9864903400553129,
+        "std": 0.641181458973499
+      },
+      "sharpe_ratio": {
+        "mean": 21.91961192335613,
+        "std": 33.34112322558021
+      },
+      "total_return_usd": {
+        "mean": 223.46872273506247,
+        "std": 270.50571176716136
+      },
+      "n_trades": {
+        "mean": 27.0,
+        "std": 25.387004549572207
+      }
+    },
+    "single": {
+      "n_trades": 234,
+      "win_rate": 0.4188034188034188,
+      "avg_win": 30.4802846642534,
+      "avg_loss": -16.072952666526657,
+      "profit_factor": 1.8963712079941157,
+      "total_return_usd": 801.1463344492081,
+      "total_return_pct": 16.022926688984164,
+      "max_drawdown_usd": -318.2855871495192,
+      "sharpe_ratio": 2.165879320522442,
+      "sortino_ratio": 9.983401880705962,
+      "tp_hits": 74,
+      "sl_hits": 124,
+      "avg_bars_held": 9.58974358974359
+    },
+    "forward": {
+      "n_trades": 172,
+      "win_rate": 0.5930232558139535,
+      "avg_win": 28.81988672073724,
+      "avg_loss": -16.178539590114934,
+      "profit_factor": 1.7813651572324953,
+      "total_return_usd": 1807.1306742071522,
+      "total_return_pct": 36.14261348414304,
+      "max_drawdown_usd": -145.95498204842806,
+      "sharpe_ratio": 6.810826099745908,
+      "sortino_ratio": 33.28560156947341,
+      "tp_hits": 77,
+      "sl_hits": 66,
+      "avg_bars_held": 10.220930232558139
+    }
+  },
+  "Alpha-65": {
+    "folds": [
+      {
+        "fold": 1,
+        "train_start": "2025-10-09",
+        "train_end": "2025-12-09",
+        "test_start": "2025-12-09",
+        "test_end": "2026-01-09",
+        "train_rows": 4263,
+        "test_rows": 2099,
+        "n_trades": 6,
+        "win_rate": 0.3333333333333333,
+        "avg_win": 30.030846508629395,
+        "avg_loss": -14.272700627514421,
+        "profit_factor": 2.104075976394892,
+        "total_return_usd": 2.9708905072011014,
+        "total_return_pct": 0.059417810144022025,
+        "max_drawdown_usd": -57.090802510057685,
+        "sharpe_ratio": 0.3317134200348219,
+        "sortino_ratio": 1.0747959867579782,
+        "tp_hits": 2,
+        "sl_hits": 3,
+        "avg_bars_held": 7.833333333333333
+      },
+      {
+        "fold": 2,
+        "train_start": "2025-11-09",
+        "train_end": "2026-01-09",
+        "test_start": "2026-01-09",
+        "test_end": "2026-02-09",
+        "train_rows": 4211,
+        "test_rows": 2096,
+        "n_trades": 15,
+        "win_rate": 0.6,
+        "avg_win": 47.41560647556182,
+        "avg_loss": -48.99112919422828,
+        "profit_factor": 0.9678406531023157,
+        "total_return_usd": 132.7936831146867,
+        "total_return_pct": 2.6558736622937342,
+        "max_drawdown_usd": -140.74388792057061,
+        "sharpe_ratio": 2.083482558005914,
+        "sortino_ratio": 4.604590517552486,
+        "tp_hits": 3,
+        "sl_hits": 6,
+        "avg_bars_held": 14.4
+      },
+      {
+        "fold": 3,
+        "train_start": "2025-12-09",
+        "train_end": "2026-02-09",
+        "test_start": "2026-02-09",
+        "test_end": "2026-03-09",
+        "train_rows": 4195,
+        "test_rows": 1984,
+        "n_trades": 103,
+        "win_rate": 0.6116504854368932,
+        "avg_win": 36.05295041334793,
+        "avg_loss": -24.09493808577988,
+        "profit_factor": 1.4962873232957306,
+        "total_return_usd": 1307.538352609724,
+        "total_return_pct": 26.150767052194478,
+        "max_drawdown_usd": -232.24289500205418,
+        "sharpe_ratio": 6.115444568421894,
+        "sortino_ratio": 17.625731675181264,
+        "tp_hits": 44,
+        "sl_hits": 37,
+        "avg_bars_held": 10.359223300970873
+      },
+      {
+        "fold": 4,
+        "train_start": "2026-01-09",
+        "train_end": "2026-03-09",
+        "test_start": "2026-03-09",
+        "test_end": "2026-04-09",
+        "train_rows": 4080,
+        "test_rows": 2176,
+        "n_trades": 58,
+        "win_rate": 0.5517241379310345,
+        "avg_win": 60.5243386754789,
+        "avg_loss": -43.82929054341097,
+        "profit_factor": 1.3809107545451191,
+        "total_return_usd": 797.2172834866398,
+        "total_return_pct": 15.944345669732796,
+        "max_drawdown_usd": -765.6663490645711,
+        "sharpe_ratio": 3.5958634967546055,
+        "sortino_ratio": 11.745358911292762,
+        "tp_hits": 23,
+        "sl_hits": 26,
+        "avg_bars_held": 10.655172413793103
+      }
+    ],
+    "aggregated": {
+      "win_rate": {
+        "mean": 0.5241769891753152,
+        "std": 0.11245097587220744
+      },
+      "profit_factor": {
+        "mean": 1.4872786768345143,
+        "std": 0.4067093740765672
+      },
+      "sharpe_ratio": {
+        "mean": 3.0316260108043087,
+        "std": 2.1223103473419114
+      },
+      "total_return_usd": {
+        "mean": 560.1300524295629,
+        "std": 526.2775471559086
+      },
+      "n_trades": {
+        "mean": 45.5,
+        "std": 38.577843381920665
+      }
+    },
+    "single": {
+      "n_trades": 263,
+      "win_rate": 0.42585551330798477,
+      "avg_win": 30.269003698997835,
+      "avg_loss": -16.787860168363206,
+      "profit_factor": 1.8030292958979908,
+      "total_return_usd": 855.1615288649137,
+      "total_return_pct": 17.103230577298277,
+      "max_drawdown_usd": -487.2192668114485,
+      "sharpe_ratio": 1.9893239651441237,
+      "sortino_ratio": 8.418106570762303,
+      "tp_hits": 81,
+      "sl_hits": 138,
+      "avg_bars_held": 9.718631178707223
+    },
+    "forward": {
+      "n_trades": 240,
+      "win_rate": 0.5125,
+      "avg_win": 29.135177042821283,
+      "avg_loss": -16.008322743987325,
+      "profit_factor": 1.8200018520843706,
+      "total_return_usd": 1710.6530152204996,
+      "total_return_pct": 34.21306030440999,
+      "max_drawdown_usd": -283.7517650840465,
+      "sharpe_ratio": 4.455657596521173,
+      "sortino_ratio": 19.38396916343174,
+      "tp_hits": 90,
+      "sl_hits": 98,
+      "avg_bars_held": 10.691666666666666
+    }
+  }
+}

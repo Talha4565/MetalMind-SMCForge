@@ -4,6 +4,7 @@ import {
   LoginPayload,
   RegisterPayload,
   PredictionResponse,
+  PredictionHistoryResponse,
   AssetType,
   BacktestRequest,
   BacktestResponse,
@@ -17,10 +18,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 class ApiClient {
   private client: AxiosInstance;
-  private token: string | null = null;
-  private refreshTokenValue: string | null = null;
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
   private isRefreshing = false;
-  private failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -28,49 +29,47 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      // Timeout after 10 seconds
       timeout: 10000,
+      withCredentials: true,
     });
 
-    // Initialize in-memory token from localStorage for reloads.
-    const savedToken = this.getToken();
-    if (savedToken) {
-      this.token = savedToken;
-    }
-
-    // Request Interceptor: Attach JWT token
+    // Request Interceptor: Attach JWT from memory only (never localStorage)
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = this.getToken();
-        if (token && config.headers) {
-          config.headers.Authorization = `Bearer ${token}`;
+        if (this.accessToken && config.headers) {
+          config.headers.Authorization = `Bearer ${this.accessToken}`;
         }
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response Interceptor: Handle errors globally
+    // Response Interceptor: Handle 401 with silent token refresh
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
         if (error.response) {
-          // Handle 401 with token refresh attempt
+          // Handle 401 — try refresh before redirecting
           if (error.response.status === 401 && !error.config._retry) {
-            const refreshTok = this.getRefreshToken();
-            if (refreshTok && !this.isRefreshing) {
-              error.config._retry = true;
-              try {
-                const newToken = await this.refreshAccessToken();
-                if (newToken) {
-                  error.config.headers.Authorization = `Bearer ${newToken}`;
-                  return this.client.request(error.config);
-                }
-              } catch {
-                // Refresh failed, fall through to clearAuth
+            if (this.refreshToken) {
+              // Attempt silent token refresh
+              const newToken = await this._silentRefresh();
+              if (newToken) {
+                // Retry original request with new token
+                error.config._retry = true;
+                error.config.headers.Authorization = `Bearer ${newToken}`;
+                return this.client.request(error.config);
               }
             }
-            this.clearAuth();
+
+            if (this.accessToken) {
+              // Refresh failed — genuinely expired, redirect to login
+              this.clearAuth();
+              if (typeof window !== 'undefined') {
+                window.location.href = '/auth/login';
+              }
+            }
+            // else: no token set yet — auth sync hasn't fired, just reject
           }
           
           // Format the error for easier consumption
@@ -93,82 +92,50 @@ class ApiClient {
     );
   }
 
-  // --- Auth Management ---
+  // --- Auth Management (memory-only, never localStorage) ---
 
-  setToken(token: string) {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('auth_token', token);
-    }
+  setTokens(accessToken: string, refreshToken?: string) {
+    this.accessToken = accessToken;
+    if (refreshToken) this.refreshToken = refreshToken;
   }
 
-  getToken(): string | null {
-    if (this.token) return this.token;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('auth_token');
-    }
-    return null;
+  setAccessToken(token: string) {
+    this.accessToken = token;
   }
 
   clearAuth() {
-    this.token = null;
-    this.refreshTokenValue = null;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('refresh_token');
-    }
+    this.accessToken = null;
+    this.refreshToken = null;
   }
 
-  setRefreshToken(token: string) {
-    this.refreshTokenValue = token;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('refresh_token', token);
-    }
-  }
-
-  getRefreshToken(): string | null {
-    if (this.refreshTokenValue) return this.refreshTokenValue;
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refresh_token');
-    }
-    return null;
-  }
-
-  private async refreshAccessToken(): Promise<string | null> {
-    if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
-        this.failedQueue.push({ resolve, reject });
-      });
+  /** Silently refresh the access token. Returns new token or null. */
+  private async _silentRefresh(): Promise<string | null> {
+    // Deduplicate concurrent refresh attempts
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
     }
 
     this.isRefreshing = true;
-    const refreshTok = this.getRefreshToken();
+    this.refreshPromise = (async () => {
+      try {
+        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+          refresh_token: this.refreshToken,
+        }, { timeout: 8000, withCredentials: true });
 
-    if (!refreshTok) {
-      this.isRefreshing = false;
-      return null;
-    }
-
-    try {
-      const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-        refresh_token: refreshTok,
-      });
-
-      const newToken = response.data.access_token;
-      if (newToken) {
-        this.setToken(newToken);
-        this.failedQueue.forEach(({ resolve }) => resolve(newToken));
-        this.failedQueue = [];
-        return newToken;
+        if (response.data?.access_token) {
+          this.accessToken = response.data.access_token;
+          return response.data.access_token;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
       }
-      return null;
-    } catch {
-      this.failedQueue.forEach(({ reject }) => reject(new Error('Refresh failed')));
-      this.failedQueue = [];
-      return null;
-    } finally {
-      this.isRefreshing = false;
-    }
+    })();
+
+    return this.refreshPromise;
   }
 
   // --- API Endpoints ---
@@ -177,10 +144,7 @@ class ApiClient {
   async login(payload: LoginPayload): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/api/auth/login', payload);
     if (response.data.token) {
-      this.setToken(response.data.token);
-    }
-    if ((response.data as any).refreshToken) {
-      this.setRefreshToken((response.data as any).refreshToken);
+      this.setAccessToken(response.data.token);
     }
     return response.data;
   }
@@ -190,9 +154,26 @@ class ApiClient {
     return response.data;
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/auth/forgot-password', { email });
+    return response.data;
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ message: string }> {
+    const response = await this.client.post<{ message: string }>('/api/auth/reset-password', { token, password });
+    return response.data;
+  }
+
   // Predictions
   async getLatestPrediction(asset: AssetType): Promise<PredictionResponse> {
-    const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`);
+    const response = await this.client.get<PredictionResponse>(`/api/predictions/latest?asset=${asset}`, { timeout: 60000 });
+    return response.data;
+  }
+
+  async getPredictionHistory(days = 7, asset?: string): Promise<PredictionHistoryResponse> {
+    const params = new URLSearchParams({ days: String(days) });
+    if (asset) params.set('asset', asset);
+    const response = await this.client.get<PredictionHistoryResponse>(`/api/predictions/history?${params}`);
     return response.data;
   }
 
@@ -241,7 +222,32 @@ class ApiClient {
   }
 
   async getBacktestResults(): Promise<BacktestResponse[]> {
-    const response = await this.client.get<BacktestResponse[]>('/api/backtest/results');
+    const response = await this.client.get('/api/backtest/results');
+    const data = response.data;
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+      // Backend may return { summary: {...}, trades: [...] } or flat { win_rate, ... }
+      const s = data.summary || data;
+      return [{
+        asset: data.asset || s.asset || undefined,
+        win_rate: s.win_rate ?? 0,
+        profit_factor: s.profit_factor ?? 0,
+        max_drawdown: s.max_drawdown ?? s.max_drawdown_pct ?? 0,
+        total_trades: s.total_trades ?? s.n_trades ?? 0,
+        net_profit: s.net_profit ?? s.total_return_usd ?? 0,
+        sharpe_ratio: s.sharpe_ratio ?? 0,
+        sortino_ratio: s.sortino_ratio ?? 0,
+        calmar_ratio: s.calmar_ratio ?? 0,
+        trades: data.trades || [],
+      }];
+    }
+    return [];
+  }
+
+  async exportBacktest(format: 'csv' | 'pdf', type: string = 'all'): Promise<Blob> {
+    const response = await this.client.get(`/api/backtest/export?format=${format}&type=${type}`, {
+      responseType: 'blob',
+    });
     return response.data;
   }
 
@@ -299,6 +305,23 @@ class ApiClient {
 
   async disable2fa(otp: string): Promise<{ success: boolean; message: string }> {
     const response = await this.client.post<{ success: boolean; message: string }>('/api/profile/2fa/disable', { otp });
+    return response.data;
+  }
+
+  // Settings
+  async getSettings(): Promise<{ settings: Record<string, unknown> }> {
+    const response = await this.client.get<{ settings: Record<string, unknown> }>('/api/profile/settings');
+    return response.data;
+  }
+
+  async updateSettings(data: Record<string, unknown>): Promise<{ message: string; settings: Record<string, unknown> }> {
+    const response = await this.client.put<{ message: string; settings: Record<string, unknown> }>('/api/profile/settings', data);
+    return response.data;
+  }
+
+  // Account
+  async deleteAccount(password: string): Promise<{ message: string }> {
+    const response = await this.client.delete<{ message: string }>('/api/profile/delete', { data: { password } });
     return response.data;
   }
 

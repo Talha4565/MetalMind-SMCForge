@@ -128,11 +128,11 @@
 
   /* Muted */
   --muted: #161920;
-  --muted-foreground: #5a6070;
+  --muted-foreground: #8a909e;
 
   /* Accent — ice blue */
   --accent: #1e2230;
-  --accent-foreground: #7eb8e8;
+  --accent-foreground: #a0d0f0;
 
   /* Destructive */
   --destructive: #e84040;
@@ -169,6 +169,62 @@
   --terminal-data: #3b9ede;
   --terminal-panel: #0e1014;
   --terminal-rule: #1a1d24;
-  --terminal-label: #5a6070;
+  --terminal-label: #8a909e;
   --terminal-value: #d4d8e0;
+}
+
+/* ============================================
+   ACCESSIBILITY — Focus indicators & skip link
+   ============================================ */
+
+/* Skip-to-content link — visible on keyboard focus */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 16px;
+}
+
+/* Focus ring — visible on all interactive elements */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Remove focus ring for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High-contrast focus for buttons and links */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15);
+}
+
+/* Reduced motion — respect OS accessibility settings */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

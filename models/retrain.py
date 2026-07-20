@@ -65,7 +65,7 @@ def retrain_model(asset: str = 'gold', n_trials: int = 30) -> Dict[str, Any]:
         
         # Save model
         if asset == 'silver':
-            save_path = Path('models/processed/silver_model_enhanced.pkl')
+            save_path = Path('models/silver_enhanced_15m.pkl')
         else:
             save_path = Path('models/enhanced_15m.pkl')
         
