@@ -641,7 +641,7 @@ def health_check():
 @app.route('/api/market/price', methods=['GET'])
 @limiter.limit("30 per minute")
 def get_live_price():
-    """Fetch real-time price from MT5 cache (written by mt5_price_cache.py on host).
+    """Fetch real-time price from MT5 cache (written by mt5_bar_updater.py on host).
     Returns 503 if cache is missing or stale (>60s old).
     
     Query params:
@@ -656,7 +656,7 @@ def get_live_price():
         # Read MT5 cache
         cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
         if not cache_path.exists():
-            return jsonify({'error': 'MT5 price cache not found. Run mt5_price_cache.py on host.', 'source': 'none'}), 503
+            return jsonify({'error': 'MT5 price cache not found. Run mt5_bar_updater.py on host.', 'source': 'none'}), 503
         
         try:
             with open(cache_path, encoding='utf-8-sig') as f:
@@ -666,7 +666,7 @@ def get_live_price():
             age_seconds = (datetime.now() - updated_at).total_seconds()
             
             if age_seconds > 60:
-                return jsonify({'error': f'MT5 cache stale ({int(age_seconds)}s old). Check mt5_price_cache.py.', 'source': 'stale'}), 503
+                return jsonify({'error': f'MT5 cache stale ({int(age_seconds)}s old). Check mt5_bar_updater.py.', 'source': 'stale'}), 503
             
             if asset not in cache.get('prices', {}):
                 return jsonify({'error': f'No MT5 price data for {asset}'}), 404
