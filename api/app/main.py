@@ -803,15 +803,23 @@ def get_latest_predictions():
         # V4 trend filter: BUY when trend_ema_cross==1 AND proba>=0.5 AND confidence>=0.65
         # SELL when trend_ema_cross==0 AND proba<0.5 AND confidence>=0.65
         # HOLD otherwise
-        if 'trend_ema_cross' in X.columns:
-            for i in range(len(predictions)):
-                proba = probabilities[i]
+        # Falls back to confidence-only filter when trend_ema_cross is absent (silver)
+        for i in range(len(predictions)):
+            proba = probabilities[i]
+            confidence = max(proba, 1 - proba)
+
+            if 'trend_ema_cross' in X.columns:
                 trend = X.iloc[i].get('trend_ema_cross', 0)
-                confidence = max(proba, 1 - proba)
                 if trend == 1 and proba >= 0.5 and confidence >= 0.65:
                     predictions[i] = 1   # BUY
                 elif trend == 0 and proba < 0.5 and confidence >= 0.65:
                     predictions[i] = -1  # SELL
+                else:
+                    predictions[i] = 0   # HOLD
+            else:
+                # Silver: trend_ema_cross unavailable — use confidence-only filter
+                if confidence >= 0.65:
+                    predictions[i] = 1 if proba >= 0.5 else -1
                 else:
                     predictions[i] = 0   # HOLD
         
@@ -853,8 +861,8 @@ def get_latest_predictions():
             traceback.print_exc()
         
         # Prepare response
-        tp_pct = 0.0045 if asset == 'gold' else 0.003
-        sl_pct = 0.0015 if asset == 'gold' else 0.001
+        tp_pct = 0.01 if asset == 'gold' else 0.015
+        sl_pct = 0.005 if asset == 'gold' else 0.0075
 
         # ── Active trade: freeze TP/SL instead of recalculating ──
         active = active_trades.get_active(asset)
@@ -898,6 +906,20 @@ def get_latest_predictions():
         # Log prediction and manage active trades
         if results:
             latest = results[-1]
+
+            # Use live MT5 price as entry when available — not CSV close.
+            # CSV close can be stale (last completed candle), MT5 is the real market.
+            try:
+                cache_path = Path(__file__).parent.parent.parent / 'data' / 'mt5_prices.json'
+                if cache_path.exists():
+                    with open(cache_path, encoding='utf-8-sig') as f:
+                        cache = json.load(f)
+                    if asset in cache.get('prices', {}):
+                        live_price = cache['prices'][asset]['price']
+                        latest['price'] = live_price  # Override with live price
+            except Exception:
+                pass  # Keep CSV close if cache unavailable
+
             entry_price = latest['price']
             is_buy_sell = latest['signal'] in (1, -1)
             high_confidence = latest['confidence'] > 0.65

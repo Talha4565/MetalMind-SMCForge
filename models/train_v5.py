@@ -50,7 +50,7 @@ RATCHET_STATE = {
 
 # V4 model path
 V4_MODEL_PATH = MODELS_DIR / 'gold_regression_system.pkl'
-V5_MODEL_PATH = MODELS_DIR / 'gold_v5.pkl'
+V5_MODEL_PATH = MODELS_DIR / 'gold_regression_system.pkl'  # overwrites the file the API loads
 
 
 def save_checkpoint(iteration: int, model, metrics: dict):

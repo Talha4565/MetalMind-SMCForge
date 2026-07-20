@@ -85,11 +85,21 @@ GOLD_LABEL_PARAMS = {
     "max_bars": 6                # Look ahead 6 bars (90 minutes on 15m)
 }
 
-# Silver has lower volatility, needs lower thresholds to generate positive labels
+# Silver has lower volatility, needs tighter thresholds to generate positive labels
 SILVER_LABEL_PARAMS = {
-    "take_profit_pct": 0.003,    # 0.3% for Silver (lower volatility)
-    "stop_loss_pct": 0.001,      # 0.1% for Silver
+    "take_profit_pct": 0.003,    # 0.3% for Silver (training labels)
+    "stop_loss_pct": 0.001,      # 0.1% for Silver (training labels)
     "max_bars": 6                # Look ahead 6 bars (90 minutes on 15m)
+}
+
+# Display TP/SL — realistic trade levels shown on dashboard (NOT training labels)
+GOLD_TRADE_PARAMS = {
+    "take_profit_pct": 0.01,     # 1.0% — realistic for gold daily range
+    "stop_loss_pct": 0.005,      # 0.5%
+}
+SILVER_TRADE_PARAMS = {
+    "take_profit_pct": 0.015,    # 1.5% — silver is more volatile
+    "stop_loss_pct": 0.0075,     # 0.75%
 }
 
 # ============================================================================

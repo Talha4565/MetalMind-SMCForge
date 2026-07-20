@@ -1,20 +1,20 @@
 {
   "asset": "silver",
-  "started_at": "2026-07-01T20:28:46.563096",
+  "started_at": "2026-07-20T08:42:22.777689",
   "status": "success",
-  "data_rows": 6859,
-  "train_rows": 4801,
-  "val_rows": 1029,
-  "test_rows": 1029,
-  "feature_count": 89,
+  "data_rows": 7313,
+  "train_rows": 5119,
+  "val_rows": 1097,
+  "test_rows": 1097,
+  "feature_count": 100,
   "best_params": {
     "max_depth": 4,
-    "lr": 0.03906007270756398,
-    "sub": 0.7053796032326152,
-    "col": 0.5315573768245632
+    "lr": 0.04047098035169792,
+    "sub": 0.8771643412619324,
+    "col": 0.6132249652770205
   },
-  "accuracy": 0.738581146744412,
-  "model_path": "models/processed/silver_model_enhanced.pkl",
-  "completed_at": "2026-07-01T20:29:38.446063",
-  "duration_seconds": 51.88
+  "accuracy": 0.7092069279854147,
+  "model_path": "models/silver_enhanced_15m.pkl",
+  "completed_at": "2026-07-20T08:45:20.441279",
+  "duration_seconds": 177.66
 }

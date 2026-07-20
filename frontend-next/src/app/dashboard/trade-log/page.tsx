@@ -121,7 +121,7 @@ export default function TradeLogPage() {
                   predictions.map((p: PredictionLogItem, i: number) => (
                     <tr key={i} className="border-b border-terminal-rule hover:bg-terminal-hold/5 transition-colors">
                       <td className="px-4 py-2.5 font-mono text-[10px] text-terminal-value tabular-nums whitespace-nowrap">
-                        {new Date(p.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                        {new Date(p.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'UTC' })}
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={cn('text-[10px] font-mono font-bold uppercase tracking-wider', p.asset === 'gold' ? 'text-terminal-hold' : 'text-terminal-label')}>{p.asset}</span>

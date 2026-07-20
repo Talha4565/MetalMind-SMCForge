@@ -73,7 +73,7 @@ class PredictionLogger:
                 model_version=pred.get('model_version')
             )
     
-    def check_outcomes(self, current_prices: Dict[str, float], tp_pct: float = 0.005, sl_pct: float = 0.003):
+    def check_outcomes(self, current_prices: Dict[str, float], tp_pct: float = 0.01, sl_pct: float = 0.005):
         """
         Check actual outcomes for open predictions.
         

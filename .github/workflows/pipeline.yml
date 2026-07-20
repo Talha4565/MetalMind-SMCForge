@@ -39,8 +39,8 @@ jobs:
       - name: Check data freshness
         run: python run_pipeline.py --mode freshness
 
-      - name: Retrain gold model
-        run: python run_pipeline.py --mode retrain --asset gold --trials 10
+      - name: Retrain gold model (V5 ratchet)
+        run: python models/train_v5.py
 
       - name: Retrain silver model
         run: python run_pipeline.py --mode retrain --asset silver --trials 10
