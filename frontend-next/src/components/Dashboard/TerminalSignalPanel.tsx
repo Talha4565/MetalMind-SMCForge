@@ -7,8 +7,10 @@ import { useEffect } from 'react';
 import { useWebSocket } from '@/lib/hooks/useWebSocket';
 import { SHAP_LABELS } from '@/lib/shap-labels';
 
-function label(raw: string) {
-  return SHAP_LABELS[raw] ?? raw.replace(/_/g, ' ').toUpperCase().slice(0, 18);
+function label(raw: string, isPositive: boolean) {
+  const entry = SHAP_LABELS[raw];
+  if (entry) return isPositive ? entry.pos : entry.neg;
+  return raw.replace(/_/g, ' ');
 }
 
 interface Props {
@@ -129,24 +131,29 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
       </div>
 
       {/* SHAP feature drivers */}
-      {topShap.length > 0 && (
+      {topShap.length > 0 && (() => {
+        const total = shap.reduce((sum, s) => sum + Math.abs(s.contribution), 0) || 1;
+        return (
         <div className="border border-terminal-rule">
           <div className="flex items-center justify-between px-3 py-1.5 bg-terminal-panel border-b border-terminal-rule">
-            <span className="text-[9px] font-mono font-bold text-terminal-label tracking-widest">SHAP KEY DRIVERS</span>
+            <span className="text-[9px] font-mono font-bold text-terminal-label tracking-widest">
+              WHY {signalLabel === 'BUY' ? 'THE MODEL SAYS BUY' : signalLabel === 'SELL' ? 'THE MODEL SAYS SELL' : 'THE MODEL SAYS HOLD'}
+            </span>
             <span className="text-[8px] font-mono text-terminal-label">TOP {topShap.length}</span>
           </div>
           <div className="divide-y divide-terminal-rule">
             {topShap.map((s, i) => {
+              const pct = Math.round((Math.abs(s.contribution) / total) * 100);
               const barWidth = Math.min((Math.abs(s.contribution) / maxAbs) * 100, 100);
               const pos = s.contribution > 0;
               return (
                 <div key={i} className="px-3 py-2">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[9px] font-mono text-terminal-label truncate max-w-[130px]" title={s.feature}>
-                      {label(s.feature)}
+                    <span className="text-[9px] font-mono text-terminal-label truncate max-w-[220px]" title={s.feature}>
+                      {pos ? '↑' : '↓'} {label(s.feature, pos)}
                     </span>
                     <span className={cn('text-[9px] font-mono font-bold tabular-nums', pos ? 'text-terminal-buy' : 'text-terminal-sell')}>
-                      {pos ? '+' : ''}{s.contribution.toFixed(3)}
+                      {pos ? '+' : '−'}{pct}%
                     </span>
                   </div>
                   {/* Diverging bar */}
@@ -168,7 +175,7 @@ export default function TerminalSignalPanel({ prediction, isLoading, livePrice }
             })}
           </div>
         </div>
-      )}
+      )})()}
 
       {/* Timestamp */}
       <div className="flex items-center gap-2 px-1">

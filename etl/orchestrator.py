@@ -51,7 +51,11 @@ class DataFreshnessChecker:
         
         try:
             df = pd.read_csv(csv_path)
-            last_date = pd.to_datetime(df['Date'].iloc[-1])
+            # Combine Date and Time columns for accurate freshness check
+            if 'Time' in df.columns:
+                last_date = pd.to_datetime(df['Date'].iloc[-1] + ' ' + df['Time'].iloc[-1])
+            else:
+                last_date = pd.to_datetime(df['Date'].iloc[-1])
             now = pd.Timestamp.now()
             age_hours = (now - last_date).total_seconds() / 3600
             

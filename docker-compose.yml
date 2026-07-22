@@ -17,6 +17,7 @@ services:
       - FLASK_APP=api/app/main.py
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - TZ=Asia/Karachi
     volumes:
       - ./api:/app/api
       - ./config:/app/config
@@ -118,6 +119,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
+      - TZ=Asia/Karachi
     volumes:
       # Mount only source code — packages stay in image
       - ./api:/app/api

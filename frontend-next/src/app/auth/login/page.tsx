@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { LoginForm } from '@/components/Auth/LoginForm';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -81,8 +81,25 @@ function LiveTickerStrip() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { status } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const [requires2fa, setRequires2fa] = useState(false);
+
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
+
+  // Show nothing while checking session (prevents flash of login form)
+  if (status === 'loading' || status === 'authenticated') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0A0B]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#B8935A] border-t-transparent" />
+      </div>
+    );
+  }
 
   const handleLogin = async (values: LoginValues) => {
     setIsLoading(true);

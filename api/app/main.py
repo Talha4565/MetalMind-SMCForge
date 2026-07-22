@@ -485,7 +485,7 @@ class BacktestManager:
                     raw_probas = np.full(len(raw_predictions), 0.5)
 
                 signals = np.zeros(len(raw_predictions), dtype=int)
-                if 'trend_ema_cross' in X.columns:
+                if asset == 'gold' and 'trend_ema_cross' in X.columns:
                     for i in range(len(raw_predictions)):
                         proba = raw_probas[i]
                         trend = X.iloc[i].get('trend_ema_cross', 0)
@@ -800,15 +800,15 @@ def get_latest_predictions():
         except (AttributeError, IndexError):
             probabilities = [0.5] * len(predictions)
 
-        # V4 trend filter: BUY when trend_ema_cross==1 AND proba>=0.5 AND confidence>=0.65
+        # V4 trend filter (gold only): BUY when trend_ema_cross==1 AND proba>=0.5 AND confidence>=0.65
         # SELL when trend_ema_cross==0 AND proba<0.5 AND confidence>=0.65
         # HOLD otherwise
-        # Falls back to confidence-only filter when trend_ema_cross is absent (silver)
+        # Silver: confidence-only filter (no trend gating needed)
         for i in range(len(predictions)):
             proba = probabilities[i]
             confidence = max(proba, 1 - proba)
 
-            if 'trend_ema_cross' in X.columns:
+            if asset == 'gold' and 'trend_ema_cross' in X.columns:
                 trend = X.iloc[i].get('trend_ema_cross', 0)
                 if trend == 1 and proba >= 0.5 and confidence >= 0.65:
                     predictions[i] = 1   # BUY
@@ -817,7 +817,7 @@ def get_latest_predictions():
                 else:
                     predictions[i] = 0   # HOLD
             else:
-                # Silver: trend_ema_cross unavailable — use confidence-only filter
+                # Silver or models without trend_ema_cross: confidence-only filter
                 if confidence >= 0.65:
                     predictions[i] = 1 if proba >= 0.5 else -1
                 else:
@@ -882,7 +882,10 @@ def get_latest_predictions():
                 signal_val = frozen_signal
                 tp_price = frozen_tp
                 sl_price = frozen_sl
-            else:
+            elif signal_val == -1:  # SELL: TP below entry, SL above entry
+                tp_price = round(entry_price * (1 - tp_pct), 2)
+                sl_price = round(entry_price * (1 + sl_pct), 2)
+            else:  # BUY or HOLD: TP above entry, SL below entry
                 tp_price = round(entry_price * (1 + tp_pct), 2)
                 sl_price = round(entry_price * (1 - sl_pct), 2)
 
@@ -896,7 +899,7 @@ def get_latest_predictions():
                 'price': float(row['close']),
                 'signal': signal_val,
                 'probability': prob_val,
-                'confidence': prob_val,
+                'confidence': max(prob_val, 1 - prob_val),
                 'tp_price': tp_price,
                 'sl_price': sl_price,
                 'shap_values': bar_shap,
@@ -1080,15 +1083,23 @@ def get_latest_predictions():
                         for line in log_file.read_text().splitlines():
                             record = json.loads(line)
                             if record.get('actual_outcome') and record.get('signal') != 0:
+                                entry = record.get('price', 0)
+                                pnl_pct = record.get('actual_pnl', 0)
+                                sig = record['signal']
+                                # Reconstruct exit price from entry + PnL
+                                if sig == 1:  # BUY
+                                    exit_price = entry * (1 + pnl_pct / 100)
+                                else:         # SELL
+                                    exit_price = entry * (1 - pnl_pct / 100)
                                 outcome_tracker.log_outcome(
                                     signal_id=f"{record['timestamp']}_{record['asset']}",
                                     asset=record['asset'],
                                     signal=record['signal'],
                                     confidence=record['confidence'],
-                                    price=record.get('price', 0),
-                                    entry_price=record.get('price', 0),
+                                    price=round(exit_price, 2),
+                                    entry_price=entry,
                                     outcome=record['actual_outcome'],
-                                    pnl=record.get('actual_pnl', 0),
+                                    pnl=pnl_pct,
                                 )
                 except Exception as e:
                     logger.warning(f"Could not update outcome tracker: {e}")

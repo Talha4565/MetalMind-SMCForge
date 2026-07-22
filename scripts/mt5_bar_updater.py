@@ -308,8 +308,8 @@ def main():
         description="MT5 OHLCV Bar Updater  -  append completed bars to CSV datasets",
     )
     parser.add_argument(
-        "--poll-interval", type=int, default=5,
-        help="Seconds between polls (default: 5)",
+        "--poll-interval", type=int, default=2,
+        help="Seconds between polls (default: 2)",
     )
     parser.add_argument(
         "--backfill-max", type=int, default=500,

@@ -63,14 +63,33 @@ def retrain_model(asset: str = 'gold', n_trials: int = 30) -> Dict[str, Any]:
         results = trainer.evaluate_and_compare()
         metrics['accuracy'] = float(results['enhanced_accuracy'])
         
-        # Save model
+        # Save model — gold must write gold_regression_system.pkl (the file the API loads).
+        # Preserve existing tp/sl models and feature names so the dict format stays compatible.
         if asset == 'silver':
             save_path = Path('models/silver_enhanced_15m.pkl')
+            with open(save_path, 'wb') as f:
+                pickle.dump(trainer.model, f)
         else:
-            save_path = Path('models/enhanced_15m.pkl')
-        
-        with open(save_path, 'wb') as f:
-            pickle.dump(trainer.model, f)
+            save_path = Path('models/gold_regression_system.pkl')
+            # Wrap gold in the dict format the API load_model() expects
+            feature_names = list(trainer.model.feature_names_in_) if hasattr(trainer.model, 'feature_names_in_') else []
+            gold_dict = {
+                'direction_model': trainer.model,
+                'features': feature_names,
+            }
+            # Carry forward tp/sl models from existing file if present
+            old_path = Path('models/gold_regression_system.pkl')
+            if old_path.exists():
+                try:
+                    with open(old_path, 'rb') as f_old:
+                        old_data = pickle.load(f_old)
+                    if isinstance(old_data, dict):
+                        gold_dict['tp_model'] = old_data.get('tp_model')
+                        gold_dict['sl_model'] = old_data.get('sl_model')
+                except Exception:
+                    pass  # Keep direction_model only if old file unreadable
+            with open(save_path, 'wb') as f:
+                pickle.dump(gold_dict, f)
         
         metrics['model_path'] = str(save_path)
         metrics['status'] = 'success'

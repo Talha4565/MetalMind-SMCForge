@@ -28,6 +28,8 @@
 
 ## Critical rules:
 
+- **NEVER commit or push to GitHub unless the user explicitly says "commit" or "push".** No `git commit`, no `git push`, no `git add` followed by commit/push. Build, test, fix, write code — but never commit/push without explicit permission.
+- **NEVER take screenshots without explicit user approval.** The screenshot skill is installed but must never be invoked autonomously. Always ask for permission before capturing any screen content.
 - **Never edit `.env` files.** Blocked by hook.
 - **Never edit CSV dataset files directly.** Use `mt5_bar_updater.py` or the pipeline.
 - **Dashboard pages use `TerminalCard`, NOT shadcn Card.** Don't recreate deleted shadcn wrappers.

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { ArrowRight, Zap, TrendingUp, Layers, Cpu, ChevronDown, BarChart3 } from 'lucide-react';
 import LiveTicker from '@/components/Landing/LiveTicker';
 
@@ -107,8 +108,10 @@ function Particles({ color, count }: { color: 'gold' | 'silver'; count: number }
 /* ──────────────────────────────────────────────
    SECTION 1 — THE VAULT (hero)
    ────────────────────────────────────────────── */
-function HeroSection() {
+function HeroSection({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { offset: parallaxY } = useParallax(0.08);
+  const goldHref = isAuthenticated ? '/dashboard/gold' : '/auth/login';
+  const silverHref = isAuthenticated ? '/dashboard/silver' : '/auth/login';
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center bg-[#040405] text-[#e8e4dc] overflow-hidden">
@@ -172,13 +175,13 @@ function HeroSection() {
 
         {/* Dual CTAs */}
         <div className="flex flex-col sm:flex-row items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-800 fill-mode-both">
-          <Link href="/dashboard/gold"
+          <Link href={goldHref}
             className="group px-9 py-4 bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0a05] font-bold rounded-xl transition-all duration-500 shadow-[0_0_40px_-8px_rgba(212,175,55,0.3)] hover:shadow-[0_0_60px_-8px_rgba(212,175,55,0.5)] hover:scale-105 flex items-center gap-2">
-            🥇 Gold Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" aria-hidden="true" />
+            🥇 {isAuthenticated ? 'Gold Dashboard' : 'Sign In'} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" aria-hidden="true" />
           </Link>
-          <Link href="/dashboard/silver"
+          <Link href={silverHref}
             className="group px-9 py-4 bg-[#b0b8c8] hover:bg-[#c4ccd8] text-[#0a0a05] font-bold rounded-xl transition-all duration-500 shadow-[0_0_40px_-8px_rgba(176,184,200,0.25)] hover:shadow-[0_0_60px_-8px_rgba(176,184,200,0.45)] hover:scale-105 flex items-center gap-2">
-            🥈 Silver Dashboard <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" aria-hidden="true" />
+            🥈 {isAuthenticated ? 'Silver Dashboard' : 'Sign In'} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" aria-hidden="true" />
           </Link>
         </div>
 
@@ -203,8 +206,10 @@ function HeroSection() {
 /* ──────────────────────────────────────────────
    SECTION 2 — THE SPLIT (gold vs silver)
    ────────────────────────────────────────────── */
-function SplitSection() {
+function SplitSection({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { ref, visible } = useReveal(0.12);
+  const goldHref = isAuthenticated ? '/dashboard/gold' : '/auth/login';
+  const silverHref = isAuthenticated ? '/dashboard/silver' : '/auth/login';
   const centerLineRef = useRef<HTMLDivElement>(null);
   const [lineProgress, setLineProgress] = useState(0);
 
@@ -272,9 +277,9 @@ function SplitSection() {
                 style={{ height: visible ? `${Math.max(5, b.h * 100)}%` : '0%', transitionDelay: `${b.delay}ms` }} />
             ))}
           </div>
-          <Link href="/dashboard/gold"
+          <Link href={goldHref}
             className="inline-flex items-center gap-2 px-8 py-3 bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0a05] font-bold rounded-xl transition-all duration-300 shadow-[0_0_30px_-6px_rgba(212,175,55,0.25)] hover:shadow-[0_0_50px_-6px_rgba(212,175,55,0.4)] hover:scale-105">
-            Enter Gold Dashboard <ArrowRight className="w-4 h-4" />
+            {isAuthenticated ? 'Enter Gold Dashboard' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
 
@@ -301,9 +306,9 @@ function SplitSection() {
                 style={{ height: visible ? `${Math.max(5, b.h * 100)}%` : '0%', transitionDelay: `${b.delay}ms` }} />
             ))}
           </div>
-          <Link href="/dashboard/silver"
+          <Link href={silverHref}
             className="inline-flex items-center gap-2 px-8 py-3 bg-[#b0b8c8] hover:bg-[#c4ccd8] text-[#0a0a05] font-bold rounded-xl transition-all duration-300 shadow-[0_0_30px_-6px_rgba(176,184,200,0.2)] hover:shadow-[0_0_50px_-6px_rgba(176,184,200,0.35)] hover:scale-105">
-            Enter Silver Dashboard <ArrowRight className="w-4 h-4" />
+            {isAuthenticated ? 'Enter Silver Dashboard' : 'Sign In'} <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
@@ -450,8 +455,10 @@ function NumbersSection() {
 /* ──────────────────────────────────────────────
    SECTION 5 — CHOOSE YOUR METAL
    ────────────────────────────────────────────── */
-function ChooseSection() {
+function ChooseSection({ isAuthenticated }: { isAuthenticated: boolean }) {
   const { ref, visible } = useReveal(0.15);
+  const goldHref = isAuthenticated ? '/dashboard/gold' : '/auth/login';
+  const silverHref = isAuthenticated ? '/dashboard/silver' : '/auth/login';
 
   return (
     <section ref={ref} className="relative min-h-[70vh] bg-[#060609] flex flex-col items-center justify-center py-24 overflow-hidden">
@@ -477,7 +484,7 @@ function ChooseSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Gold */}
-          <Link href="/dashboard/gold"
+          <Link href={goldHref}
             className="group flex flex-col items-center rounded-2xl border border-[#d4af37]/30 bg-[#0a0b0f] px-10 py-12 transition-all duration-700 ease-out hover:border-[#d4af37]/60 hover:shadow-[0_0_60px_-12px_rgba(212,175,55,0.2)] hover:scale-[1.03]"
             style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateX(0)' : 'translateX(-50px)', transitionDelay: '200ms' }}>
             <span className="text-5xl mb-4">🥇</span>
@@ -485,12 +492,12 @@ function ChooseSection() {
             <span className="font-black font-mono text-3xl text-[#e8e4dc] mb-3">XAU/USD</span>
             <span className="text-sm text-[#16b979] font-semibold mb-4">82.7% accuracy</span>
             <span className="inline-flex items-center gap-2 px-8 py-3 bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0a05] font-bold rounded-xl transition-all duration-300 shadow-[0_0_30px_-6px_rgba(212,175,55,0.25)]">
-              Enter Dashboard <ArrowRight className="w-4 h-4" />
+              {isAuthenticated ? 'Enter Dashboard' : 'Sign In'} <ArrowRight className="w-4 h-4" />
             </span>
           </Link>
 
           {/* Silver */}
-          <Link href="/dashboard/silver"
+          <Link href={silverHref}
             className="group flex flex-col items-center rounded-2xl border border-[#b0b8c8]/30 bg-[#0a0b0f] px-10 py-12 transition-all duration-700 ease-out hover:border-[#b0b8c8]/60 hover:shadow-[0_0_60px_-12px_rgba(176,184,200,0.15)] hover:scale-[1.03]"
             style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateX(0)' : 'translateX(50px)', transitionDelay: '400ms' }}>
             <span className="text-5xl mb-4">🥈</span>
@@ -498,7 +505,7 @@ function ChooseSection() {
             <span className="font-black font-mono text-3xl text-[#e8e4dc] mb-3">XAG/USD</span>
             <span className="text-sm text-[#f59e0b] font-semibold mb-4">73.9% accuracy</span>
             <span className="inline-flex items-center gap-2 px-8 py-3 bg-[#b0b8c8] hover:bg-[#c4ccd8] text-[#0a0a05] font-bold rounded-xl transition-all duration-300 shadow-[0_0_30px_-6px_rgba(176,184,200,0.2)]">
-              Enter Dashboard <ArrowRight className="w-4 h-4" />
+              {isAuthenticated ? 'Enter Dashboard' : 'Sign In'} <ArrowRight className="w-4 h-4" />
             </span>
           </Link>
         </div>
@@ -513,8 +520,35 @@ function ChooseSection() {
    PAGE
    ────────────────────────────────────────────── */
 export default function Home() {
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === 'authenticated';
+
   return (
     <main className="bg-[#040405] text-[#e8e4dc]">
+      {/* Session-aware top navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-[#040405]/80 backdrop-blur-md border-b border-white/[0.06]">
+        <Link href="/" className="font-mono text-[11px] tracking-[0.3em] text-[#5C5C59] hover:text-[#B8935A] transition-colors">
+          METALMIND
+        </Link>
+        <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <Link
+              href="/dashboard"
+              className="px-5 py-2 bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0a05] text-sm font-bold rounded-lg transition-all duration-300 flex items-center gap-2"
+            >
+              Dashboard <ArrowRight className="w-4 h-4" />
+            </Link>
+          ) : (
+            <Link
+              href="/auth/login"
+              className="px-5 py-2 border border-[#B8935A]/40 hover:border-[#B8935A] text-[#B8935A] text-sm font-semibold rounded-lg transition-all duration-300"
+            >
+              Sign In
+            </Link>
+          )}
+        </div>
+      </nav>
+
       <style jsx global>{`
         @keyframes float-up {
           0%   { transform: translateY(0) translateX(0); opacity: 0; }
@@ -542,11 +576,11 @@ export default function Home() {
         html { scroll-behavior: smooth; }
       `}</style>
 
-      <HeroSection />
-      <SplitSection />
+      <HeroSection isAuthenticated={isAuthenticated} />
+      <SplitSection isAuthenticated={isAuthenticated} />
       <EngineSection />
       <NumbersSection />
-      <ChooseSection />
+      <ChooseSection isAuthenticated={isAuthenticated} />
     </main>
   );
 }
